@@ -2,9 +2,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Rung.Abstractions;
 using Rung.Core;
-using Rung.Sinks.Redis;
 
-namespace Rung.Cli;
+namespace Rung.Configuration;
 
 /// <summary>
 /// 采集配置。MVP 阶段用 JSON 文件，后续会迁到 SQLite + Web UI。
@@ -100,7 +99,14 @@ public sealed record RungConfig
     }
 }
 
-/// <summary>Redis 北向输出配置。</summary>
+/// <summary>
+/// Redis 北向输出配置。
+/// <para>
+/// 刻意只放纯数据，不提供转成 <c>RedisSinkOptions</c> 的方法——
+/// 配置层反向依赖某个具体的北向实现，将来加 MQTT、InfluxDB 时会越缠越死。
+/// 映射由宿主完成。
+/// </para>
+/// </summary>
 public sealed record RedisConfig
 {
     /// <summary>是否启用。</summary>
@@ -123,16 +129,6 @@ public sealed record RedisConfig
 
     /// <summary>设备状态的上报周期，秒。0 表示不上报。</summary>
     public int StatusIntervalSeconds { get; init; } = 10;
-
-    /// <summary>转换成输出参数。</summary>
-    public RedisSinkOptions ToSinkOptions() => new()
-    {
-        ConnectionString = ConnectionString,
-        KeyPrefix = KeyPrefix,
-        Database = Database,
-        PublishChanges = PublishChanges,
-        ChannelName = ChannelName,
-    };
 }
 
 /// <summary>断线重连配置。</summary>

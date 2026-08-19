@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Rung.Abstractions;
+using Rung.Configuration;
 using Rung.Core;
 using Rung.Drivers.S7;
 using Rung.Sinks.Redis;
@@ -102,7 +103,7 @@ public static class Program
         if (config.Redis is { Enabled: true } redisConfig)
         {
             redis = await RedisTagSink.ConnectAsync(
-                redisConfig.ToSinkOptions(),
+                ToSinkOptions(redisConfig),
                 loggerFactory.CreateLogger<RedisTagSink>(),
                 cancellationToken).ConfigureAwait(false);
 
@@ -261,6 +262,16 @@ public static class Program
             // 停机
         }
     }
+
+    /// <summary>把配置映射成 Redis 输出参数。映射放在宿主侧，配置层不依赖具体实现。</summary>
+    private static RedisSinkOptions ToSinkOptions(RedisConfig config) => new()
+    {
+        ConnectionString = config.ConnectionString,
+        KeyPrefix = config.KeyPrefix,
+        Database = config.Database,
+        PublishChanges = config.PublishChanges,
+        ChannelName = config.ChannelName,
+    };
 
     private static async Task Observe(Task task)
     {

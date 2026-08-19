@@ -6,7 +6,7 @@
 采集到的数据通过 REST、MQTT 或 Redis 供上层系统使用。单文件部署，无外部依赖。
 
 > **状态：v0.1 MVP。** 已经是一个能挂在服务器上长期运行的采集服务：
-> 多台设备并行采集、断线自己按退避重连、数据写进 Redis 供应用读取。
+> 多台设备并行采集、断线自己按退避重连、数据写进 Redis，并提供 REST + SSE 接口。
 > Web UI 与 SQLite 配置还在路上。
 
 ## 跑起来（不需要 PLC）
@@ -18,8 +18,11 @@ dotnet run --project src/Rung.Simulator -- samples/simulator.json
 ```
 
 ```bash
-dotnet run --project src/Rung.Cli -- samples/gateway.json
+dotnet run --project src/Rung.Host -- --ConfigPath $PWD/samples/gateway.json
 ```
+
+然后 <http://localhost:5580/api/health>。想在终端里看数据流的话，
+`src/Rung.Cli` 是同一套内核的命令行形态。
 
 ```
 [line1-oven]  PDU 240 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 0.1 ms
@@ -38,6 +41,25 @@ dotnet run --project src/Rung.Cli -- samples/gateway.json
 ```
 
 `--once` 采一轮就退出，适合脚本和现场点位验证；`--timeout <秒>` 控制首次连接的等待上限。
+
+## HTTP 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/health` | 整体健康，有设备掉线为 `degraded`，可直接接监控探针 |
+| GET | `/api/devices` | 全部设备的连接状态、上轮耗时、重连次数、配置问题 |
+| GET | `/api/tags` | 点位最新值，支持 `?device=` 与 `?prefix=` 过滤 |
+| GET | `/api/tags/{name}` | 单个点位 |
+| POST | `/api/tags/{name}/write` | 写点位，**返回回读到的设备实际值** |
+| GET | `/api/stream/tags` | 变化的实时推送（SSE） |
+| GET | `/openapi/v1.json` | OpenAPI 文档 |
+
+写入路径上显式写出 `write` 而不是用 `PUT`：这个动作会让产线上的机器真的动起来，
+一眼看得出比符合 REST 惯例更重要。返回值是**写完立刻从设备回读**的结果——
+PLC 可能对写入做钳位、取整，或被联锁逻辑改回去，操作员必须看到真正生效的值。
+
+默认端口 **5580**：5000 是 Kestrel 默认、8080 到处都是、9090 归 Prometheus，
+挑个冷门的省掉部署时的端口撞车。
 
 ## 模拟器
 
@@ -88,6 +110,11 @@ rung:device:line2-flaky
 现场排障最常用的动作就是 `redis-cli HGETALL rung:tag:Line1.Oven.Temp`，
 那一眼看不懂的话这个设计就失败了。
 
+**HTTP 接口，实时推送用 SSE。** 点位值、设备状况、写命令走 REST；
+变化推送走 Server-Sent Events 而不是 WebSocket——单向推送 SSE 就够，
+浏览器 `EventSource` 自带断线重连，走普通 HTTP 所以 nginx 反代零配置。
+慢客户端的队列满了丢最旧的而不是阻塞：实时视图丢几帧无所谓，采集停了是事故。
+
 **每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象，Modbus 直接用
 FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任何单一上游库上。
 
@@ -99,7 +126,9 @@ src/
   Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
   Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
   Rung.Core/               采集内核：连接生命周期、退避重连、调度、缓存、写队列
-  Rung.Cli/                命令行入口（MVP 的可执行形态）
+  Rung.Cli/                命令行入口，终端里看数据流
+  Rung.Host/               ASP.NET Core 宿主：REST + SSE + OpenAPI
+  Rung.Configuration/      配置模型，CLI 与 Host 共用
   Rung.Sinks.Redis/        Redis 北向输出
   Rung.Simulator/          S7 设备模拟器（活信号 + 故障注入）与最小 Redis
 samples/                   配置文件示例
@@ -109,6 +138,7 @@ tests/
   Rung.Core.Tests/         可编程假驱动 + 调度、重连、多设备编排测试
   Rung.Simulator.Tests/    信号源与地址解析
   Rung.Sinks.Redis.Tests/  真实 Redis 客户端 × 模拟 Redis 的端到端用例
+  Rung.Host.Tests/         走真实 HTTP 管道的接口测试
 third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
@@ -137,7 +167,7 @@ dotnet test
 - [x] 多设备编排：一个进程管多台设备，按业务名路由写命令
 - [x] 设备模拟器：活信号 + 故障注入，无需真机即可验证全链路
 - [x] Redis 北向输出：最新值 Hash、变化 Pub/Sub、设备状况
-- [ ] REST + SSE 接口，供调试与实时推送
+- [x] REST + SSE 接口，带 OpenAPI 文档
 - [ ] MQTT 输出
 - [ ] SQLite 配置存储 + Excel 导入导出
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus

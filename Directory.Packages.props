@@ -10,6 +10,18 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Label="Web">
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+
+    <!--
+      传递依赖钉版本：Microsoft.AspNetCore.OpenApi 10.0.10 带的 Microsoft.OpenApi 2.0.0
+      存在高危漏洞 GHSA-v5pm-xwqc-g5wc（循环 schema 引用会终止解析），2.7.5 起修复。
+      CentralPackageTransitivePinningEnabled 让这里的声明能覆盖传递版本。
+      升级 AspNetCore.OpenApi 之后记得回来确认这条还需不需要。
+    -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Sinks">
     <PackageVersion Include="StackExchange.Redis" Version="3.1.13" />
   </ItemGroup>
@@ -21,6 +33,7 @@
 
   <ItemGroup Label="Test">
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
   </ItemGroup>
 
 </Project>

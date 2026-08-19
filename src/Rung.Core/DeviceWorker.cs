@@ -81,13 +81,19 @@ public sealed class DeviceWorker : IAsyncDisposable
     public IReadOnlyList<string> PollGroups => [.. _groups.Select(static g => g.Name)];
 
     /// <summary>
-    /// 下发一个写命令，等待它真正执行完毕。
+    /// 下发一个写命令，等待它执行并回读确认。
     /// <para>
-    /// 写命令会插队到下一次采集之前执行，并在写完后记录审计日志——
-    /// 谁、什么时候、往哪个点位写了什么值。产线上这个日志迟早会救你一次。
+    /// 写命令插队到下一次采集之前执行，写完<b>立即从设备回读同一个点位</b>，
+    /// 返回的是设备上的真实值而不是刚发出去的值。这不是锦上添花：
+    /// PLC 程序可能对写入值做钳位、取整，或者干脆被联锁逻辑改回去，
+    /// 操作员必须看到实际生效的结果。
+    /// </para>
+    /// <para>
+    /// 每次写都会记一条 Information 级审计日志——谁、什么时候、往哪个点位写了什么值。
     /// </para>
     /// </summary>
-    public async Task WriteAsync(TagDef tag, TagValue value, CancellationToken cancellationToken)
+    /// <returns>回读到的设备实际值。</returns>
+    public async Task<TagValue> WriteAsync(TagDef tag, TagValue value, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(tag);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -97,7 +103,7 @@ public sealed class DeviceWorker : IAsyncDisposable
             throw new RungException($"设备 {_deviceOptions.DeviceId} 未连接，无法写入点位 {tag.Name}");
         }
 
-        var command = new WriteCommand(tag, value, new TaskCompletionSource(
+        var command = new WriteCommand(tag, value, new TaskCompletionSource<TagValue>(
             TaskCreationOptions.RunContinuationsAsynchronously));
 
         if (!_writes.Writer.TryWrite(command))
@@ -107,9 +113,9 @@ public sealed class DeviceWorker : IAsyncDisposable
         }
 
         using var registration = cancellationToken.Register(
-            static state => ((TaskCompletionSource)state!).TrySetCanceled(), command.Completion);
+            static state => ((TaskCompletionSource<TagValue>)state!).TrySetCanceled(), command.Completion);
 
-        await command.Completion.Task.ConfigureAwait(false);
+        return await command.Completion.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -253,7 +259,8 @@ public sealed class DeviceWorker : IAsyncDisposable
             Log.TagWritten(
                 _logger, _deviceOptions.DeviceId, command.Tag.Name, command.Value, command.Tag.Address);
 
-            command.Completion.TrySetResult();
+            var actual = await ReadBackAsync(driver, command.Tag, cancellationToken).ConfigureAwait(false);
+            command.Completion.TrySetResult(actual);
         }
         catch (Exception ex)
         {
@@ -264,6 +271,37 @@ public sealed class DeviceWorker : IAsyncDisposable
             // 写失败往往意味着链路已经不行了，交给外层重连
             throw;
         }
+    }
+
+    /// <summary>
+    /// 写完立刻回读同一个点位。
+    /// <para>
+    /// 每次写都临时编译一份单点计划，看着浪费，但写命令是操作员触发的低频动作，
+    /// 换来的是"返回值确实来自设备"这个硬保证，很划算。
+    /// </para>
+    /// </summary>
+    private async Task<TagValue> ReadBackAsync(
+        IDeviceDriver driver,
+        TagDef tag,
+        CancellationToken cancellationToken)
+    {
+        var timestamp = _time.GetUtcNow().UtcDateTime;
+        var plan = driver.CreateReadPlan([tag]);
+
+        if (plan.Issues.Count > 0)
+        {
+            return TagValue.Bad(tag.DataType, TagQuality.ConfigError, timestamp);
+        }
+
+        var buffer = new TagValue[plan.Tags.Count];
+        await driver.ExecuteAsync(plan, buffer, cancellationToken).ConfigureAwait(false);
+
+        // 回读结果同样进缓存并向北推送：写完之后所有消费者立刻看到新值，
+        // 不必等下一个采集周期
+        var changed = _cache.Update(_deviceOptions.DeviceId, plan.Tags, buffer);
+        await PublishAsync(changed, cancellationToken).ConfigureAwait(false);
+
+        return buffer[0];
     }
 
     private async Task PublishAsync(IReadOnlyList<TagSnapshot> changed, CancellationToken cancellationToken)
@@ -443,7 +481,7 @@ public sealed class DeviceWorker : IAsyncDisposable
         await TeardownAsync().ConfigureAwait(false);
     }
 
-    private sealed record WriteCommand(TagDef Tag, TagValue Value, TaskCompletionSource Completion);
+    private sealed record WriteCommand(TagDef Tag, TagValue Value, TaskCompletionSource<TagValue> Completion);
 
     private sealed class PollGroup(string name, TimeSpan interval, IReadOnlyList<TagDef> tags)
     {

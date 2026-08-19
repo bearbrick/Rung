@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Rung.Configuration</PackageId>
+    <Description>Rung 的配置模型与加载。CLI 与 Host 共用，将来 SQLite 配置存储也落在这里。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -149,9 +149,11 @@ public sealed class GatewayHost : IAsyncDisposable
         await Task.WhenAll(loops).ConfigureAwait(false);
     }
 
-    /// <summary>按业务点位名下发写命令，自动路由到对应设备。</summary>
+    /// <summary>
+    /// 按业务点位名下发写命令，自动路由到对应设备，返回回读到的设备实际值。
+    /// </summary>
     /// <exception cref="RungException">点位名不存在。</exception>
-    public Task WriteAsync(string tagName, TagValue value, CancellationToken cancellationToken)
+    public Task<TagValue> WriteAsync(string tagName, TagValue value, CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -162,6 +164,31 @@ public sealed class GatewayHost : IAsyncDisposable
 
         return route.Worker.WriteAsync(route.Tag, value, cancellationToken);
     }
+
+    /// <summary>该业务点位挂在哪台设备上。</summary>
+    /// <exception cref="RungException">点位名不存在。</exception>
+    public string DeviceIdOf(string tagName)
+        => _tagRoutes.TryGetValue(tagName, out var route)
+            ? route.Worker.Status.DeviceId
+            : throw new RungException($"未知的点位名 \"{tagName}\"");
+
+    /// <summary>按业务名取得点位定义。写接口要靠它决定如何解释传入的值。</summary>
+    public bool TryGetTag(string tagName, out TagDef tag)
+    {
+        if (_tagRoutes.TryGetValue(tagName, out var route))
+        {
+            tag = route.Tag;
+            return true;
+        }
+
+        tag = null!;
+        return false;
+    }
+
+    /// <summary>全部点位定义，按业务名排序。</summary>
+    public IReadOnlyList<TagDef> AllTags
+        => [.. _tagRoutes.Values.Select(static route => route.Tag)
+            .OrderBy(static tag => tag.Name, StringComparer.Ordinal)];
 
     /// <summary>按设备标识取得运行状况。</summary>
     public bool TryGetStatus(string deviceId, out DeviceStatus status)
