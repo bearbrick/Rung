@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
     <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />
     <ProjectReference Include="..\Rung.Drivers.S7\Rung.Drivers.S7.csproj" />
+    <ProjectReference Include="..\Rung.Sinks.Redis\Rung.Sinks.Redis.csproj" />
   </ItemGroup>
 
 </Project>

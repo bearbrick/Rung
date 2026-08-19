@@ -22,6 +22,16 @@ public sealed record SimulatedDeviceConfig
     public FaultInjection? Faults { get; init; }
 }
 
+/// <summary>内置 Redis 模拟器的配置。</summary>
+public sealed record RedisSimulatorConfig
+{
+    /// <summary>是否启用。</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>监听端口。0 表示由系统分配。</summary>
+    public int Port { get; init; } = 6379;
+}
+
 /// <summary>模拟器配置：一个进程可以同时扮演多台设备。</summary>
 public sealed record SimulatorConfig
 {
@@ -30,6 +40,12 @@ public sealed record SimulatorConfig
 
     /// <summary>要模拟的设备。</summary>
     public IReadOnlyList<SimulatedDeviceConfig> Devices { get; init; } = [];
+
+    /// <summary>
+    /// 是否同时起一个最小 Redis，用于验证北向输出。
+    /// 开发机上不装 Redis、不装 Docker 也能把整条链路跑通。
+    /// </summary>
+    public RedisSimulatorConfig? Redis { get; init; }
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {

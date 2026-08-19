@@ -1,5 +1,9 @@
 {
   "version": 1,
+  "redis": {
+    "enabled": true,
+    "port": 16379
+  },
   "devices": [
     {
       "name": "line1-oven",

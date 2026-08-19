@@ -6,12 +6,12 @@
 采集到的数据通过 REST、MQTT 或 Redis 供上层系统使用。单文件部署，无外部依赖。
 
 > **状态：v0.1 MVP。** 已经是一个能挂在服务器上长期运行的采集服务：
-> 断线自己按退避重连、恢复后继续采集，不需要人工重启。
-> 北向输出目前只有控制台，Redis / MQTT / Web UI 还在路上。
+> 多台设备并行采集、断线自己按退避重连、数据写进 Redis 供应用读取。
+> Web UI 与 SQLite 配置还在路上。
 
 ## 跑起来（不需要 PLC）
 
-仓库自带一个西门子 S7 设备模拟器。开两个终端：
+仓库自带模拟器，连 PLC 和 Redis 都不需要。开两个终端：
 
 ```bash
 dotnet run --project src/Rung.Simulator -- samples/simulator.json
@@ -53,6 +53,16 @@ dotnet run --project src/Rung.Cli -- samples/gateway.json
 **报文编码是独立实现的**，不引用 Rung 的任何代码。两边同源的话，一个写错的偏移量
 会同时体现在模拟器和被测代码上，测试全绿但真机一读就错。独立实现才能互为对照。
 
+**还内置一个最小 Redis**（说 RESP2 协议），因此北向输出也能在不装 Redis、
+不装 Docker 的机器上端到端验证——用的是真实的 StackExchange.Redis 客户端。
+
+```
+rung:tag:Line1.Oven.Temp
+    v=242  q=Good  t=2026-08-19T05:55:04.658Z  dev=line1-oven  addr=DB1.DBW0
+rung:device:line2-flaky
+    state=Faulted  lastError=对端关闭了连接  consecutiveFailures=1  tags=1  requests=1
+```
+
 ## 设计要点
 
 **业务名与 PLC 地址解耦。** 应用侧只认 `Line1.Oven3.Temp` 这样的业务名，
@@ -72,6 +82,12 @@ dotnet run --project src/Rung.Cli -- samples/gateway.json
 同时断线，没有抖动它们会整整齐齐地在同一毫秒重连。断线期间缓存降级为
 `Stale` 但保留最后已知值——应用侧读到"5 分钟前的 235 度"，比读到 null 有用得多。
 
+**北向主推 Redis。** 最新值写进 `rung:tag:{业务名}` 的 Hash，变化推送到
+`rung:changes` 频道，设备状况写进 `rung:device:{id}`。网关和应用完全解耦，
+网关重启不影响应用读到最后已知值。值刻意存成人能直接读懂的文本——
+现场排障最常用的动作就是 `redis-cli HGETALL rung:tag:Line1.Oven.Temp`，
+那一眼看不懂的话这个设计就失败了。
+
 **每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象，Modbus 直接用
 FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任何单一上游库上。
 
@@ -84,13 +100,15 @@ src/
   Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
   Rung.Core/               采集内核：连接生命周期、退避重连、调度、缓存、写队列
   Rung.Cli/                命令行入口（MVP 的可执行形态）
-  Rung.Simulator/          西门子 S7 设备模拟器：活信号 + 故障注入
+  Rung.Sinks.Redis/        Redis 北向输出
+  Rung.Simulator/          S7 设备模拟器（活信号 + 故障注入）与最小 Redis
 samples/                   配置文件示例
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
   Rung.Drivers.S7.Tests/   进程内假 S7 设备 + 端到端链路测试
   Rung.Core.Tests/         可编程假驱动 + 调度、重连、多设备编排测试
   Rung.Simulator.Tests/    信号源与地址解析
+  Rung.Sinks.Redis.Tests/  真实 Redis 客户端 × 模拟 Redis 的端到端用例
 third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
@@ -118,7 +136,9 @@ dotnet test
 - [x] 采集内核：退避重连、按组独立调度、点位缓存、写命令插队、死区过滤
 - [x] 多设备编排：一个进程管多台设备，按业务名路由写命令
 - [x] 设备模拟器：活信号 + 故障注入，无需真机即可验证全链路
-- [ ] 北向输出：Redis / REST / SSE / MQTT
+- [x] Redis 北向输出：最新值 Hash、变化 Pub/Sub、设备状况
+- [ ] REST + SSE 接口，供调试与实时推送
+- [ ] MQTT 输出
 - [ ] SQLite 配置存储 + Excel 导入导出
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
 - [ ] Web UI：设备列表、点位实时值、手动读写测试

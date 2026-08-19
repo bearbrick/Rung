@@ -5,6 +5,13 @@
     "fast": 300,
     "slow": 5000
   },
+  "redis": {
+    "enabled": true,
+    "connectionString": "127.0.0.1:16379",
+    "keyPrefix": "rung",
+    "publishChanges": true,
+    "statusIntervalSeconds": 5
+  },
   "reconnect": {
     "initialDelayMs": 1000,
     "maxDelayMs": 30000,
@@ -48,7 +55,14 @@
       "host": "127.0.0.1",
       "port": 10104,
       "extra": { "rack": "0", "slot": "1" },
-      "reconnect": { "initialDelayMs": 500, "maxDelayMs": 4000, "jitterRatio": 0.2 },
+      "redis": {
+    "enabled": true,
+    "connectionString": "127.0.0.1:16379",
+    "keyPrefix": "rung",
+    "publishChanges": true,
+    "statusIntervalSeconds": 5
+  },
+  "reconnect": { "initialDelayMs": 500, "maxDelayMs": 4000, "jitterRatio": 0.2 },
       "tags": [
         { "name": "Line2.Flaky.Counter", "address": "DB1.DBW0", "dataType": "Int16" }
       ]

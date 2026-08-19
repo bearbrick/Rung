@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Rung.Abstractions;
 using Rung.Core;
+using Rung.Sinks.Redis;
 
 namespace Rung.Cli;
 
@@ -37,6 +38,9 @@ public sealed record RungConfig
 
     /// <summary>断线重连参数。</summary>
     public ReconnectConfig? Reconnect { get; init; }
+
+    /// <summary>Redis 北向输出。不配则只往控制台打印。</summary>
+    public RedisConfig? Redis { get; init; }
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -94,6 +98,41 @@ public sealed record RungConfig
             },
         };
     }
+}
+
+/// <summary>Redis 北向输出配置。</summary>
+public sealed record RedisConfig
+{
+    /// <summary>是否启用。</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>连接字符串，StackExchange.Redis 格式。</summary>
+    public string ConnectionString { get; init; } = "127.0.0.1:6379";
+
+    /// <summary>键前缀，所有键长成 <c>{prefix}:tag:{业务名}</c>。</summary>
+    public string KeyPrefix { get; init; } = "rung";
+
+    /// <summary>数据库编号，-1 表示用连接字符串里的默认值。</summary>
+    public int Database { get; init; } = -1;
+
+    /// <summary>是否把变化推送到 Pub/Sub 频道。</summary>
+    public bool PublishChanges { get; init; } = true;
+
+    /// <summary>频道名，缺省为 <c>{prefix}:changes</c>。</summary>
+    public string? ChannelName { get; init; }
+
+    /// <summary>设备状态的上报周期，秒。0 表示不上报。</summary>
+    public int StatusIntervalSeconds { get; init; } = 10;
+
+    /// <summary>转换成输出参数。</summary>
+    public RedisSinkOptions ToSinkOptions() => new()
+    {
+        ConnectionString = ConnectionString,
+        KeyPrefix = KeyPrefix,
+        Database = Database,
+        PublishChanges = PublishChanges,
+        ChannelName = ChannelName,
+    };
 }
 
 /// <summary>断线重连配置。</summary>

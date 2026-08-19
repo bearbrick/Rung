@@ -56,6 +56,9 @@ public static class Program
                   failingDbNumbers     指定 DB 一律返回"对象不存在"
                   rejectWrites         拒绝所有写命令
 
+                同时可内置一个最小 Redis（redis 段），
+                这样开发机上不装 Redis、不装 Docker 也能验证北向输出。
+
                 配置示例见 samples/simulator.json
                 """);
 
@@ -80,9 +83,16 @@ public static class Program
         }
 
         var servers = new List<S7SimulatorServer>();
+        RedisSimulatorServer? redis = null;
 
         try
         {
+            if (config.Redis is { Enabled: true } redisConfig)
+            {
+                redis = new RedisSimulatorServer(redisConfig.Port);
+                output.WriteLine($"[redis] 监听 127.0.0.1:{redis.Port}（最小 Redis，仅用于测试）");
+            }
+
             foreach (var device in config.Devices)
             {
                 var server = new S7SimulatorServer(device);
@@ -114,6 +124,11 @@ public static class Program
             foreach (var server in servers)
             {
                 await server.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (redis is not null)
+            {
+                await redis.DisposeAsync().ConfigureAwait(false);
             }
         }
     }

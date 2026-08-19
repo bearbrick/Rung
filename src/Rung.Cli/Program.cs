@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Rung.Abstractions;
 using Rung.Core;
 using Rung.Drivers.S7;
+using Rung.Sinks.Redis;
 
 namespace Rung.Cli;
 
@@ -91,8 +92,26 @@ public static class Program
         var cache = new TagCache();
 
         // --once 只要一轮结果，不必让输出被逐条变化刷屏
-        IReadOnlyList<ITagSink> sinks = once ? [] : [new ConsoleTagSink(output)];
+        var sinks = new List<ITagSink>();
+        if (!once)
+        {
+            sinks.Add(new ConsoleTagSink(output));
+        }
 
+        RedisTagSink? redis = null;
+        if (config.Redis is { Enabled: true } redisConfig)
+        {
+            redis = await RedisTagSink.ConnectAsync(
+                redisConfig.ToSinkOptions(),
+                loggerFactory.CreateLogger<RedisTagSink>(),
+                cancellationToken).ConfigureAwait(false);
+
+            sinks.Add(redis);
+            output.WriteLine(
+                $"Redis 输出：{redisConfig.ConnectionString}，键前缀 {redisConfig.KeyPrefix}:tag:*");
+        }
+
+        await using var redisScope = redis;
         await using var host = new GatewayHost([new S7DriverFactory()], cache, sinks, loggerFactory);
 
         foreach (var device in devices)
@@ -124,7 +143,10 @@ public static class Program
             output.WriteLine();
             output.WriteLine("持续采集中，Ctrl+C 停止。只打印发生变化的点位。");
 
+            var statusLoop = PublishStatusPeriodicallyAsync(host, redis, config.Redis, scope.Token);
+
             await run.ConfigureAwait(false);
+            await Observe(statusLoop).ConfigureAwait(false);
             return 0;
         }
         finally
@@ -205,6 +227,38 @@ public static class Program
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  {snapshot.Tag.Name.PadRight(nameWidth)}  {ConsoleTagSink.Format(snapshot.Value),20}"
                 + $"   {snapshot.DeviceId}/{snapshot.Tag.Address}"));
+        }
+    }
+
+    /// <summary>
+    /// 周期性把设备状态写进 Redis。
+    /// 运维侧只要 <c>redis-cli HGETALL rung:device:xxx</c> 就能看到每台设备的死活，
+    /// 不必登到网关机器上翻日志。
+    /// </summary>
+    private static async Task PublishStatusPeriodicallyAsync(
+        GatewayHost host,
+        RedisTagSink? redis,
+        RedisConfig? config,
+        CancellationToken cancellationToken)
+    {
+        if (redis is null || config is null || config.StatusIntervalSeconds <= 0)
+        {
+            return;
+        }
+
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(config.StatusIntervalSeconds));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                await redis.PublishDeviceStatusAsync(host.DeviceStatuses, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 停机
         }
     }
 
