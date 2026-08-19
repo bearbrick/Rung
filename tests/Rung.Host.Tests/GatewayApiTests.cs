@@ -222,6 +222,18 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
     }
 
     [Fact]
+    public async Task 提供Prometheus指标()
+    {
+        var response = await _fixture.Client.GetAsync("/metrics", TestContext.Current.CancellationToken);
+        var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("rung_device_up{device=\"oven\"} 1", text, StringComparison.Ordinal);
+        Assert.Contains("rung_tags_total 3", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 提供OpenAPI文档()
     {
         var document = await _fixture.Client.GetStringAsync(

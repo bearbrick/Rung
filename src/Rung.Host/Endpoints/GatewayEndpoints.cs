@@ -42,8 +42,19 @@ public static class GatewayEndpoints
             .WithSummary("点位变化的实时推送（SSE）")
             .WithDescription("只推送越过死区的变化。浏览器用 EventSource 订阅，自带断线重连。");
 
+        // /metrics 按惯例挂在根上而不是 /api 下，抓取端默认就找这个路径
+        app.MapGet("/metrics", GetMetrics)
+            .WithTags("Rung")
+            .WithSummary("Prometheus 指标")
+            .ExcludeFromDescription();
+
         return app;
     }
+
+    private static ContentHttpResult GetMetrics(GatewayHost gateway)
+        => TypedResults.Text(
+            PrometheusFormatter.Render(gateway.DeviceStatuses, gateway.Cache, DateTime.UtcNow),
+            "text/plain; version=0.0.4; charset=utf-8");
 
     private static Ok<HealthView> GetHealth(GatewayHost gateway, GatewayStartupTime startup)
     {

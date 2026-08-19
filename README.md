@@ -89,6 +89,7 @@ TypeScript 类型由 OpenAPI 文档生成（`npm run gen:api`）。后端改了 
 | POST | `/api/tags/{name}/write` | 写点位，**返回回读到的设备实际值** |
 | GET | `/api/stream/tags` | 变化的实时推送（SSE） |
 | GET | `/openapi/v1.json` | OpenAPI 文档 |
+| GET | `/metrics` | Prometheus 指标（挂在根上，抓取端默认路径） |
 
 写入路径上显式写出 `write` 而不是用 `PUT`：这个动作会让产线上的机器真的动起来，
 一眼看得出比符合 REST 惯例更重要。返回值是**写完立刻从设备回读**的结果——
@@ -96,6 +97,24 @@ PLC 可能对写入做钳位、取整，或被联锁逻辑改回去，操作员�
 
 默认端口 **5580**：5000 是 Kestrel 默认、8080 到处都是、9090 归 Prometheus，
 挑个冷门的省掉部署时的端口撞车。
+
+## 可观测性
+
+`/metrics` 直接可被 Prometheus 抓取，手写暴露格式、不引额外依赖。
+
+```
+rung_device_up{device="line1-oven"} 1
+rung_device_poll_duration_seconds{device="line1-oven"} 0.000383
+rung_device_overruns_total{device="line1-oven"} 0
+rung_device_last_success_age_seconds{device="line1-oven"} 0.4
+```
+
+几个刻意的选择：耗时用**秒**（Prometheus 的基本单位约定，用毫秒会让所有查询手工换算）；
+上次成功采集用**距今秒数**而非绝对时间戳（告警好写，也不必关心两端时钟是否对齐）；
+从未成功过时给 **-1** 而不是 0——0 会被误读成"刚刚才采过"，正好反了。
+
+`rung_device_overruns_total` 持续增长是最值得配告警的一个：
+它说明采集周期设得太快，或者点位太多需要拆组。
 
 ## 模拟器
 
