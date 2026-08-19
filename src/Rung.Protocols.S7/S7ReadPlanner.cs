@@ -90,8 +90,10 @@ public static class S7ReadPlanner
                 continue;
             }
 
-            var byteLength = tag.ByteLength;
-            if (byteLength <= 0)
+            // 走 S7ValueCodec 而不是 tag.ByteLength：西门子 STRING 另有 2 字节头，
+            // 那是协议特有的开销，必须算进读取长度
+            var byteLength = S7ValueCodec.GetReadByteLength(tag);
+            if (tag.DataType.IsVariableLength() && tag.Length <= 0)
             {
                 issues.Add(new TagIssue(i, tag.Name,
                     $"{tag.DataType} 是变长类型，必须配置 Length"));

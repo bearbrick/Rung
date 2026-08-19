@@ -42,7 +42,15 @@ public sealed record TagDef
     /// <summary>多字节数值的字节序。</summary>
     public ByteOrder ByteOrder { get; init; } = ByteOrder.ABCD;
 
-    /// <summary>线性换算的倍率。工程值 = 原始值 * Scale + Offset。</summary>
+    /// <summary>
+    /// 线性换算的倍率。工程值 = 原始值 * Scale + Offset。
+    /// <para>
+    /// <b>换算生效时，采集结果的类型会提升为 <see cref="TagDataType.Float64"/>。</b>
+    /// PLC 里存的是 2350（Int16），乘 0.1 之后是 235.0 度——
+    /// <see cref="DataType"/> 描述的是 PLC 侧的存储形式，
+    /// 而应用侧要的是工程值，两者本来就不必是同一个类型。
+    /// </para>
+    /// </summary>
     public double Scale { get; init; } = 1.0;
 
     /// <summary>线性换算的偏移量。</summary>
@@ -69,6 +77,9 @@ public sealed record TagDef
     /// <summary>是否启用。停用的点位不参与采集计划。</summary>
     public bool Enabled { get; init; } = true;
 
-    /// <summary>该点位一次读取需要的字节数。</summary>
+    /// <summary>
+    /// 该点位在 PLC 上占用的字节数，不含任何协议特有的头部。
+    /// 例如西门子的 STRING 另有 2 字节头，那部分由 S7 协议层自己补，不体现在这里。
+    /// </summary>
     public int ByteLength => DataType.IsVariableLength() ? Length : DataType.SizeInBytes();
 }
