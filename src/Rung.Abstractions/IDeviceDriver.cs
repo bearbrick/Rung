@@ -29,6 +29,12 @@ public interface IReadPlan
     IReadOnlyList<TagDef> Tags { get; }
 
     /// <summary>
+    /// 编译计划时发现的配置问题。有问题的点位不参与采集，每轮被置为
+    /// <see cref="TagQuality.ConfigError"/>，其余点位不受影响。
+    /// </summary>
+    IReadOnlyList<TagIssue> Issues { get; }
+
+    /// <summary>
     /// 合并之后真正发往设备的请求次数。
     /// 暴露出来是为了让 Web UI 能显示"128 个点位 → 3 次请求"，
     /// 现场调优采集周期时这个数字比什么都直观。
@@ -67,8 +73,11 @@ public interface IDeviceDriver : IAsyncDisposable
     /// <summary>
     /// 编译一份读取计划：解析地址、按连续性合并请求、按 PDU 上限切分。
     /// 点位配置变更时重新调用，正常采集周期内复用同一份计划。
+    /// <para>
+    /// 单个点位的配置错误不会中断整份计划，而是记入 <see cref="IReadPlan.Issues"/>。
+    /// 只有当整批点位都无法编译时才应抛出异常。
+    /// </para>
     /// </summary>
-    /// <exception cref="AddressFormatException">存在无法解析的地址。</exception>
     IReadPlan CreateReadPlan(IReadOnlyList<TagDef> tags);
 
     /// <summary>

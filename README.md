@@ -18,6 +18,10 @@
 因而可以用真实报文夹具做字节级断言。协议实现的正确性不靠"看起来能跑"，
 靠每个字节都被测试锁住——详见 [`docs/protocol-fixtures.md`](docs/protocol-fixtures.md)。
 
+**批量合并决定性能。** 点位按地址连续性合并成尽量少的请求，再按 PDU 双重上限
+（单次读字节数、单请求项数）切分。一个状态 DB 里连续排布的 128 个点位，
+逐个读要 128 次网络往返，合并后只要 2 次。
+
 **每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象，Modbus 直接用
 FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任何单一上游库上。
 
@@ -26,7 +30,7 @@ FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任�
 ```
 src/
   Rung.Abstractions/       驱动契约层。第三方按此接口实现驱动即可接入
-  Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析
+  Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
 third_party/IoTClient/     上游溯源与许可证
@@ -46,7 +50,8 @@ dotnet test
 
 - [x] 驱动契约层 `IDeviceDriver` / `TagDef` / `TagValue`
 - [x] S7 协议编解码 + 报文夹具测试
-- [ ] 批量合并算法：按地址连续性合并请求，按 PDU 上限切分
+- [x] 批量合并算法：按地址连续性合并请求，按 PDU 上限切分
+- [ ] 值解码器：字节序（ABCD/CDAB/BADC/DCBA）、线性换算、S7 STRING 头部
 - [ ] `Rung.Drivers.S7`：异步传输层、连接管理、重连状态机
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
 - [ ] `Rung.Core`：SQLite 配置存储、采集调度、点位缓存、写命令队列
