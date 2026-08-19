@@ -74,5 +74,39 @@
         "dropEverySeconds": 15
       }
     }
+  ],
+  "modbusDevices": [
+    {
+      "name": "line2-meter",
+      "port": 10502,
+      "unitIds": [1, 2],
+      "signals": [
+        {
+          "address": "HR0", "type": "Float32",
+          "generator": "sine", "min": 380, "max": 400, "periodSeconds": 25,
+          "description": "线电压 V"
+        },
+        {
+          "address": "HR2", "type": "Float32",
+          "generator": "randomwalk", "min": 40, "max": 60, "step": 0.4, "periodSeconds": 1,
+          "description": "有功功率 kW"
+        },
+        {
+          "address": "HR10", "type": "Int32",
+          "generator": "counter", "value": 500000, "step": 2, "periodSeconds": 1,
+          "description": "累计电量 kWh"
+        },
+        {
+          "address": "CO0", "type": "Int16",
+          "generator": "toggle", "periodSeconds": 7,
+          "description": "合闸状态"
+        },
+        {
+          "address": "2:HR0", "type": "Int16",
+          "generator": "counter", "value": 0, "step": 1, "periodSeconds": 3,
+          "description": "二号从站的计数器"
+        }
+      ]
+    }
   ]
 }

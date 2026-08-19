@@ -38,8 +38,11 @@ public sealed record SimulatorConfig
     /// <summary>配置结构版本。</summary>
     public int Version { get; init; } = 1;
 
-    /// <summary>要模拟的设备。</summary>
+    /// <summary>要模拟的西门子 S7 设备。</summary>
     public IReadOnlyList<SimulatedDeviceConfig> Devices { get; init; } = [];
+
+    /// <summary>要模拟的 Modbus TCP 从站。</summary>
+    public IReadOnlyList<SimulatedModbusDeviceConfig> ModbusDevices { get; init; } = [];
 
     /// <summary>
     /// 是否同时起一个最小 Redis，用于验证北向输出。

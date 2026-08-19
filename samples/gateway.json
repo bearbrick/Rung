@@ -50,6 +50,25 @@
       ]
     },
     {
+      "deviceId": "line2-meter",
+      "protocol": "modbus-tcp",
+      "host": "127.0.0.1",
+      "port": 10502,
+      "extra": { "unitId": "1" },
+      "tags": [
+        { "name": "Line2.Meter.Voltage", "address": "HR0", "dataType": "Float32",
+          "deadband": 0.5, "description": "线电压 V" },
+        { "name": "Line2.Meter.Power", "address": "HR2", "dataType": "Float32",
+          "deadband": 0.2, "description": "有功功率 kW" },
+        { "name": "Line2.Meter.Energy", "address": "HR10", "dataType": "Int32",
+          "description": "累计电量 kWh" },
+        { "name": "Line2.Meter.Closed", "address": "CO0", "dataType": "Bool",
+          "description": "合闸状态" },
+        { "name": "Line2.Slave2.Count", "address": "2:HR0", "dataType": "Int16",
+          "description": "二号从站计数器" }
+      ]
+    },
+    {
       "deviceId": "line2-flaky",
       "protocol": "s7",
       "host": "127.0.0.1",

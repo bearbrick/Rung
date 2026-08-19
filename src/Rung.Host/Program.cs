@@ -1,6 +1,7 @@
 using Rung.Abstractions;
 using Rung.Configuration;
 using Rung.Core;
+using Rung.Drivers.Modbus;
 using Rung.Drivers.S7;
 using Rung.Host;
 using Rung.Host.Endpoints;
@@ -37,6 +38,7 @@ builder.Services.AddSingleton(rungConfig);
 builder.Services.AddSingleton<TagCache>();
 builder.Services.AddSingleton<TagChangeBroadcaster>();
 builder.Services.AddSingleton<IDeviceDriverFactory, S7DriverFactory>();
+builder.Services.AddSingleton<IDeviceDriverFactory, ModbusDriverFactory>();
 
 // Redis 输出是可选的：没配就整个不注册，下游用 GetService 取到 null 即可。
 // 连不上也不影响采集——abortConnect=false 让它自己在后台重连

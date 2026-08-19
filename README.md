@@ -61,6 +61,23 @@ TypeScript 类型由 OpenAPI 文档生成（`npm run gen:api`）。后端改了 
 而前端没重新生成，`npm run lint` 会当场报错——前后端契约漂移是这类项目
 最常见的低级 bug 来源，配一次就永久消失。
 
+## Modbus 地址写法
+
+0 基与 1 基混淆是 Modbus 接入时最高频的错误，因此两种写法在语义上刻意区分得很开。
+
+| 写法 | 含义 |
+|---|---|
+| `HR100` `IR10` `CO5` `DI7` | **0 基**，推荐 |
+| `40001` `30001` `10001` `00001` | 经典 **1 基**，`40001` 等于 `HR0` |
+| `4x0001` | 同经典 1 基 |
+| `HR100.3` | 保持寄存器 100 的第 3 位 |
+| `3:HR100` | 指定从站号 3（一条 TCP 连接后面挂多个 RTU 从站） |
+
+不带位偏移的布尔点位按"整寄存器非零为真"解释——很多设备用一整个寄存器表示一个状态位。
+
+**寄存器内的单个位不能写**：Modbus 没有对应的功能码，只能读改写，
+而读改写在并发下会丢掉别人刚写进去的位。这里明确拒绝而不是悄悄做。
+
 ## HTTP 接口
 
 | 方法 | 路径 | 说明 |
@@ -134,8 +151,13 @@ rung:device:line2-flaky
 浏览器 `EventSource` 自带断线重连，走普通 HTTP 所以 nginx 反代零配置。
 慢客户端的队列满了丢最旧的而不是阻塞：实时视图丢几帧无所谓，采集停了是事故。
 
-**每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象，Modbus 直接用
-FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任何单一上游库上。
+**每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象：S7 自己实现报文
+（因为没有可用的 MIT 库），Modbus 直接用 FluentModbus（原生异步、维护活跃、
+还自带服务端便于测试）。不把身家压在任何单一上游库上。
+
+加 Modbus 时 `IDeviceDriver`、`IReadPlan`、`TagDef`、`TagValue`、
+`DeviceWorker`、`GatewayHost` **一行都没改**——抽象层算是经受住了第二种协议的检验。
+唯一的调整是把字节序换算从 S7 里提到契约层共用，那是收敛而不是修补。
 
 ## 仓库结构
 
@@ -144,6 +166,7 @@ src/
   Rung.Abstractions/       驱动契约层。第三方按此接口实现驱动即可接入
   Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
   Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
+  Rung.Drivers.Modbus/     Modbus TCP 驱动：地址语义、批量合并、多从站
   Rung.Core/               采集内核：连接生命周期、退避重连、调度、缓存、写队列
   Rung.Cli/                命令行入口，终端里看数据流
   Rung.Host/               ASP.NET Core 宿主：REST + SSE + OpenAPI
@@ -154,6 +177,7 @@ samples/                   配置文件示例
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
   Rung.Drivers.S7.Tests/   进程内假 S7 设备 + 端到端链路测试
+  Rung.Drivers.Modbus.Tests/ FluentModbus 服务端 + 可掐断的 TCP 代理
   Rung.Core.Tests/         可编程假驱动 + 调度、重连、多设备编排测试
   Rung.Simulator.Tests/    信号源与地址解析
   Rung.Sinks.Redis.Tests/  真实 Redis 客户端 × 模拟 Redis 的端到端用例
@@ -189,7 +213,7 @@ dotnet test
 - [x] REST + SSE 接口，带 OpenAPI 文档
 - [ ] MQTT 输出
 - [ ] SQLite 配置存储 + Excel 导入导出（现在还是 JSON 文件）
-- [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
+- [x] `Rung.Drivers.Modbus`：基于 FluentModbus，支持多从站与四种地址写法
 - [x] Web UI：点位实时值、设备状况、手动读写
 - [ ] 打包：Docker 多架构镜像 + Linux 单文件自包含发布
 

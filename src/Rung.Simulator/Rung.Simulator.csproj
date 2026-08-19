@@ -7,6 +7,12 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Modbus 从站直接用 FluentModbus 的服务端：Rung 的 Modbus 也用它做客户端，
+         两边同源在这里不损失任何东西——Rung 本来就没有独立的 Modbus 报文实现 -->
+    <PackageReference Include="FluentModbus" />
+  </ItemGroup>
+
   <!--
     刻意不引用 Rung 的任何项目。
     模拟器负责"编码"，Rung 负责"解码"，两边必须是独立实现——

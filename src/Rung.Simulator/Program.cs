@@ -83,6 +83,7 @@ public static class Program
         }
 
         var servers = new List<S7SimulatorServer>();
+        var modbusServers = new List<ModbusSimulatorServer>();
         RedisSimulatorServer? redis = null;
 
         try
@@ -108,6 +109,21 @@ public static class Program
                 }
             }
 
+            foreach (var device in config.ModbusDevices)
+            {
+                var server = new ModbusSimulatorServer(device);
+                modbusServers.Add(server);
+
+                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"[{server.Name}] 监听 127.0.0.1:{server.Port}（Modbus TCP，"
+                    + $"从站 {string.Join("/", device.UnitIds)}），{device.Signals.Count} 个信号"));
+
+                foreach (var signal in device.Signals)
+                {
+                    output.WriteLine($"    {signal}  {signal.Description}");
+                }
+            }
+
             output.WriteLine();
             output.WriteLine("模拟器运行中，Ctrl+C 停止。");
 
@@ -122,6 +138,11 @@ public static class Program
         finally
         {
             foreach (var server in servers)
+            {
+                await server.DisposeAsync().ConfigureAwait(false);
+            }
+
+            foreach (var server in modbusServers)
             {
                 await server.DisposeAsync().ConfigureAwait(false);
             }
