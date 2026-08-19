@@ -5,8 +5,9 @@
 把西门子 S7、三菱 MC、欧姆龙 FINS、Modbus 设备的点位可视化配置好，
 采集到的数据通过 REST、MQTT 或 Redis 供上层系统使用。单文件部署，无外部依赖。
 
-> **状态：v0.1 MVP。** S7 链路已经打通——配置文件指向一台西门子 PLC，
-> 就能把点位值采下来。采集调度、北向输出、Web UI 还在路上，路线图见下方。
+> **状态：v0.1 MVP。** 已经是一个能挂在服务器上长期运行的采集服务：
+> 断线自己按退避重连、恢复后继续采集，不需要人工重启。
+> 北向输出目前只有控制台，Redis / MQTT / Web UI 还在路上。
 
 ## 跑起来
 
@@ -16,14 +17,21 @@ dotnet run --project src/Rung.Cli -- samples/s7-demo.json
 
 ```
 已连接，协商 PDU 长度 240 字节
-采集计划：4 个点位 → 1 次请求，每轮取回 14 字节
+采集计划：4/4 个点位 → 每轮 1 次请求，上轮耗时 2.0 ms
   Line1.Oven3.Temp                       235   DB1.DBW0
   Line1.Oven3.Pressure               1013.25   DB1.DBD4
   Line1.Oven3.Running                   true   DB1.DBX8.0
   Line1.Output.Count                  128456   DB1.DBD10
+
+持续采集中，Ctrl+C 停止。只打印发生变化的点位。
+13:26:42.185  Line1.Output.Count                       128498
+13:26:42 warn: 设备 line1-plc 通讯中断（连续第 1 次）：对端关闭了连接，00:00:00.88 后重连
+13:26:43 warn: 设备 line1-plc 通讯中断（连续第 2 次）：Connection refused，00:00:02.08 后重连
+13:26:49 info: 设备 line1-plc 已连接，PDU 240 字节，4 个点位编译成 1 次请求
+13:26:49.964  Line1.Output.Count                       128463
 ```
 
-加 `--once` 采一轮就退出，适合脚本和现场点位验证。
+`--once` 采一轮就退出，适合脚本和现场点位验证；`--timeout <秒>` 控制首次连接的等待上限。
 
 ## 设计要点
 
@@ -39,6 +47,11 @@ dotnet run --project src/Rung.Cli -- samples/s7-demo.json
 （单次读字节数、单请求项数）切分。一个状态 DB 里连续排布的 128 个点位，
 逐个读要 128 次网络往返，合并后只要 2 次。
 
+**断线是常态，不是异常。** 每台设备一个工作者，断线后按指数退避重连
+（1s→2s→4s…30s 封顶，带抖动）。抖动不是锦上添花：一台交换机重启会让几十台设备
+同时断线，没有抖动它们会整整齐齐地在同一毫秒重连。断线期间缓存降级为
+`Stale` 但保留最后已知值——应用侧读到"5 分钟前的 235 度"，比读到 null 有用得多。
+
 **每个协议独立选型。** 驱动层通过 `IDeviceDriver` 抽象，Modbus 直接用
 FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任何单一上游库上。
 
@@ -49,11 +62,13 @@ src/
   Rung.Abstractions/       驱动契约层。第三方按此接口实现驱动即可接入
   Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
   Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
+  Rung.Core/               采集内核：连接生命周期、退避重连、调度、缓存、写队列
   Rung.Cli/                命令行入口（MVP 的可执行形态）
 samples/                   配置文件示例
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
   Rung.Drivers.S7.Tests/   进程内假 S7 设备 + 端到端链路测试
+  Rung.Core.Tests/         可编程假驱动 + 调度与重连测试
 third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
@@ -79,10 +94,11 @@ dotnet test
 - [x] 值编解码：字节序（ABCD/CDAB/BADC/DCBA）、线性换算、S7 STRING
 - [x] `Rung.Drivers.S7`：异步传输层、连接管理、读写执行
 - [x] CLI：配置文件驱动的采集与打印
-- [ ] 重连状态机：指数退避，不把 PLC 的连接资源占满
-- [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
-- [ ] `Rung.Core`：SQLite 配置存储、采集调度、点位缓存、写命令队列
+- [x] 采集内核：退避重连、按组独立调度、点位缓存、写命令插队、死区过滤
+- [ ] 多设备编排：一个进程管多台设备
 - [ ] 北向输出：Redis / REST / SSE / MQTT
+- [ ] SQLite 配置存储 + Excel 导入导出
+- [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
 - [ ] Web UI：设备列表、点位实时值、手动读写测试
 - [ ] 打包：Docker 多架构镜像 + Linux 单文件自包含发布
 

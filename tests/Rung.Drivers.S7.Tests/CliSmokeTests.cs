@@ -65,7 +65,7 @@ public class CliSmokeTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Contains("已连接，协商 PDU 长度 240 字节", text, StringComparison.Ordinal);
-        Assert.Contains("2 个点位 → 1 次请求", text, StringComparison.Ordinal);
+        Assert.Contains("2/2 个点位 → 每轮 1 次请求", text, StringComparison.Ordinal);
         Assert.Contains("235", text, StringComparison.Ordinal);
         Assert.Contains("true", text, StringComparison.Ordinal);
     }
@@ -96,24 +96,29 @@ public class CliSmokeTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Contains("! 配置问题 typo", text, StringComparison.Ordinal);
+        Assert.Contains("1/2 个点位", text, StringComparison.Ordinal);
         Assert.Contains("ConfigError", text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task 连不上时给出非零退出码和可读的错误()
+    public async Task 连不上时在有界时间内退出并说明原因()
     {
+        // 作为常驻服务，连不上就无限重连是对的；但首次启动必须有超时，
+        // 否则配置写错的表现是"进程静静挂着什么也不说"——最糟糕的失败方式
         var output = new StringWriter();
 
-        // 端口 1 上不会有 S7 设备
         var configPath = WriteConfigCore(1, """
                 { "name": "t", "address": "DB1.DBW0", "dataType": "Int16" }
             """);
 
-        var exitCode = await Assert.ThrowsAnyAsync<Exception>(async () => await Program.RunAsync(
-            [configPath, "--once"], output, TestContext.Current.CancellationToken))
-            is not null ? 1 : 0;
+        var exitCode = await Program.RunAsync(
+            [configPath, "--once", "--timeout", "2"], output, TestContext.Current.CancellationToken);
+
+        var text = output.ToString();
 
         Assert.Equal(1, exitCode);
+        Assert.Contains("未能完成首次采集", text, StringComparison.Ordinal);
+        Assert.Contains("最后一次错误", text, StringComparison.Ordinal);
     }
 
     [Fact]

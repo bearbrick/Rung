@@ -1,5 +1,7 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
 using Rung.Abstractions;
+using Rung.Core;
 using Rung.Drivers.S7;
 
 namespace Rung.Cli;
@@ -7,9 +9,8 @@ namespace Rung.Cli;
 /// <summary>
 /// Rung 的命令行入口。
 /// <para>
-/// MVP 阶段它就是全部的"产品"：指向一台 PLC，把点位值打出来。
-/// 采集调度、北向输出、Web UI 都还没有，但这条链路是完整的——
-/// 握手、批量合并、拆包、字节序、质量标记，一个不少。
+/// 它是一个真正的常驻服务：断线会按退避策略自己重连，恢复后继续采集，
+/// 不需要人工重启。<c>--once</c> 则采一轮就退出，适合脚本和现场点位验证。
 /// </para>
 /// </summary>
 public static class Program
@@ -27,10 +28,7 @@ public static class Program
         return await RunAsync(args, Console.Out, cancellation.Token).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// 可测试的入口：输出目标和取消信号都从外面传进来，
-    /// 这样端到端冒烟测试可以直接调它，不必启子进程。
-    /// </summary>
+    /// <summary>可测试的入口：输出目标和取消信号都从外面传进来。</summary>
     public static async Task<int> RunAsync(string[] args, TextWriter output, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -44,6 +42,8 @@ public static class Program
 
         var configPath = args[0];
         var once = args.Contains("--once", StringComparer.Ordinal);
+        var quiet = args.Contains("--quiet", StringComparer.Ordinal);
+        var startupTimeout = ParseTimeout(args);
 
         if (!File.Exists(configPath))
         {
@@ -53,8 +53,9 @@ public static class Program
 
         try
         {
-            var config = RungConfig.Load(configPath);
-            return await PollAsync(config, once, output, cancellationToken).ConfigureAwait(false);
+            return await ServeAsync(
+                RungConfig.Load(configPath), once, quiet, startupTimeout, output, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -68,14 +69,15 @@ public static class Program
         }
     }
 
-    private static async Task<int> PollAsync(
+    private static async Task<int> ServeAsync(
         RungConfig config,
         bool once,
+        bool quiet,
+        TimeSpan startupTimeout,
         TextWriter output,
         CancellationToken cancellationToken)
     {
         var deviceOptions = config.ToDeviceOptions();
-        var tags = config.ToTagDefs();
 
         if (!string.Equals(deviceOptions.Protocol, "s7", StringComparison.OrdinalIgnoreCase))
         {
@@ -83,84 +85,143 @@ public static class Program
             return 1;
         }
 
-        await using var driver = new S7Driver(deviceOptions);
+        using var loggerFactory = LoggerFactory.Create(builder => builder
+            .SetMinimumLevel(quiet ? LogLevel.Warning : LogLevel.Information)
+            .AddSimpleConsole(o =>
+            {
+                o.SingleLine = true;
+                o.TimestampFormat = "HH:mm:ss ";
+            }));
+
+        var cache = new TagCache();
+        var tags = config.ToTagDefs();
+
+        // --once 只要一轮结果，不必让输出被逐条变化刷屏
+        IReadOnlyList<ITagSink> sinks = once ? [] : [new ConsoleTagSink(output)];
+
+        await using var worker = new DeviceWorker(
+            new S7DriverFactory(),
+            deviceOptions,
+            tags,
+            cache,
+            sinks,
+            config.ToWorkerOptions(),
+            loggerFactory.CreateLogger<DeviceWorker>());
 
         output.WriteLine($"正在连接 {deviceOptions.Host}:{deviceOptions.Port} …");
-        await driver.ConnectAsync(cancellationToken).ConfigureAwait(false);
-        output.WriteLine($"已连接，协商 PDU 长度 {driver.MaxPduLength} 字节");
 
-        var plan = (Rung.Protocols.S7.S7ReadPlan)driver.CreateReadPlan(tags);
-        PrintPlanSummary(plan, output);
+        using var scope = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var run = worker.RunAsync(scope.Token);
 
-        var values = new TagValue[tags.Count];
-
-        if (once)
+        try
         {
-            await driver.ExecuteAsync(plan, values, cancellationToken).ConfigureAwait(false);
-            PrintValues(tags, values, output);
-            return 0;
-        }
+            await WaitForFirstPollAsync(worker, startupTimeout, scope.Token).ConfigureAwait(false);
+            PrintDeviceSummary(worker, tags.Count, output);
+            PrintValues(cache, output);
 
-        // 用 PeriodicTimer 而不是 Task.Delay 循环：后者会把每轮的执行耗时
-        // 累加进周期，跑上几小时就明显漂移了
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(config.PollIntervalMs));
-
-        while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
-        {
-            var started = DateTime.UtcNow;
-            var good = await driver.ExecuteAsync(plan, values, cancellationToken).ConfigureAwait(false);
-            var elapsed = DateTime.UtcNow - started;
+            if (once)
+            {
+                return 0;
+            }
 
             output.WriteLine();
-            output.WriteLine(FormattableString.Invariant(
-                $"── {DateTime.Now:HH:mm:ss}  {good}/{tags.Count} 良好  耗时 {elapsed.TotalMilliseconds:F1} ms"));
-            PrintValues(tags, values, output);
-        }
+            output.WriteLine("持续采集中，Ctrl+C 停止。只打印发生变化的点位。");
 
-        return 0;
+            await run.ConfigureAwait(false);
+            return 0;
+        }
+        finally
+        {
+            await scope.CancelAsync().ConfigureAwait(false);
+            await Observe(run).ConfigureAwait(false);
+        }
     }
 
-    private static void PrintPlanSummary(Rung.Protocols.S7.S7ReadPlan plan, TextWriter output)
+    /// <summary>
+    /// 等第一轮采集出结果。
+    /// <para>
+    /// 这里必须有超时。作为常驻服务，连不上就无限重连是对的；
+    /// 但首次启动时若配置写错（IP 打错、机架槽号不对），
+    /// 无限重连的表现就是进程静静地挂在那里什么也不说——
+    /// 最糟糕的失败方式。所以给启动阶段设一个上限，到点就把原因说出来。
+    /// </para>
+    /// </summary>
+    private static async Task WaitForFirstPollAsync(
+        DeviceWorker worker,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
-        var needed = plan.Tags.Count == 0 ? 0 : plan.TotalFetchedBytes;
+        var deadline = DateTime.UtcNow + timeout;
 
-        output.WriteLine(FormattableString.Invariant(
-            $"采集计划：{plan.ActiveTagCount} 个点位 → {plan.RequestCount} 次请求，每轮取回 {needed} 字节"));
+        while (worker.Status.LastSuccessUtc is null)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                var reason = worker.Status.LastError ?? "未知原因";
+                throw new RungException(
+                    $"{timeout.TotalSeconds:F0} 秒内未能完成首次采集（连续失败 "
+                    + $"{worker.Status.ConsecutiveFailures} 次）。最后一次错误：{reason}");
+            }
 
-        foreach (var issue in plan.Issues)
+            await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>解析 <c>--timeout &lt;秒&gt;</c>，缺省 30 秒。</summary>
+    private static TimeSpan ParseTimeout(string[] args)
+    {
+        var index = Array.IndexOf(args, "--timeout");
+
+        return index >= 0 && index + 1 < args.Length
+            && int.TryParse(args[index + 1], NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+                ? TimeSpan.FromSeconds(seconds)
+                : TimeSpan.FromSeconds(30);
+    }
+
+    private static void PrintDeviceSummary(DeviceWorker worker, int tagCount, TextWriter output)
+    {
+        var status = worker.Status;
+
+        output.WriteLine($"已连接，协商 PDU 长度 {status.NegotiatedPduLength} 字节");
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"采集计划：{status.ActiveTagCount}/{tagCount} 个点位 → 每轮 {status.RequestCount} 次请求，"
+            + $"上轮耗时 {status.LastPollDuration.TotalMilliseconds:F1} ms"));
+
+        foreach (var issue in status.Issues)
         {
             output.WriteLine($"  ! 配置问题 {issue}");
         }
     }
 
-    private static void PrintValues(IReadOnlyList<TagDef> tags, TagValue[] values, TextWriter output)
+    private static void PrintValues(TagCache cache, TextWriter output)
     {
-        var nameWidth = Math.Max(4, tags.Max(static t => t.Name.Length));
-
-        for (var i = 0; i < tags.Count; i++)
+        var snapshots = cache.Snapshot();
+        if (snapshots.Count == 0)
         {
-            var value = values[i];
-            var display = value.Quality switch
-            {
-                TagQuality.Good => Format(value),
-                TagQuality.Uninitialized => "—",
-                _ => $"<{value.Quality}>",
-            };
+            return;
+        }
 
+        var nameWidth = Math.Max(4, snapshots.Max(static s => s.Tag.Name.Length));
+
+        foreach (var snapshot in snapshots)
+        {
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                $"  {tags[i].Name.PadRight(nameWidth)}  {display,20}   {tags[i].Address}"));
+                $"  {snapshot.Tag.Name.PadRight(nameWidth)}  {ConsoleTagSink.Format(snapshot.Value),20}"
+                + $"   {snapshot.Tag.Address}"));
         }
     }
 
-    private static string Format(TagValue value) => value.DataType switch
+    private static async Task Observe(Task task)
     {
-        TagDataType.Float32 or TagDataType.Float64 =>
-            value.AsDouble().ToString("0.###", CultureInfo.InvariantCulture),
-        TagDataType.Bool => value.AsBool() ? "true" : "false",
-        TagDataType.String => value.AsString(),
-        TagDataType.Bytes => Convert.ToHexString(value.AsBytes()),
-        _ => value.AsInt64().ToString(CultureInfo.InvariantCulture),
-    };
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // 停机路径上的预期取消
+        }
+    }
 
     private static void PrintUsage(TextWriter output)
     {
@@ -168,8 +229,10 @@ public static class Program
             Rung — 轻量级 PLC 数据采集网关
 
             用法：
-              rung <配置文件.json>          按配置周期采集并打印
+              rung <配置文件.json>          持续采集，断线自动重连，Ctrl+C 停止
               rung <配置文件.json> --once   采集一轮后退出
+              rung <配置文件.json> --quiet  只打印警告以上级别的日志
+              rung <配置文件.json> --timeout <秒>  首次连接的等待上限，缺省 30
 
             配置文件示例见 samples/s7-demo.json
             """);

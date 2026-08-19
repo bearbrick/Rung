@@ -141,6 +141,30 @@ public readonly struct TagValue : IEquatable<TagValue>
         _ => null,
     };
 
+    /// <summary>
+    /// 是否与另一个采集值表示相同的读数，<b>忽略时间戳</b>。
+    /// <para>
+    /// 变化检测必须用它而不是 <see cref="Equals(TagValue)"/>：
+    /// 每轮采集的时间戳都不同，用完整相等判断的话，一个恒定不变的点位
+    /// 也会被判成"每轮都在变"，死区形同虚设，下游会被无意义的推送淹掉。
+    /// </para>
+    /// </summary>
+    public bool HasSameValue(TagValue other)
+    {
+        if (DataType != other.DataType || Quality != other.Quality)
+        {
+            return false;
+        }
+
+        return (_reference, other._reference) switch
+        {
+            (null, null) => _bits == other._bits,
+            (byte[] a, byte[] b) => a.AsSpan().SequenceEqual(b),
+            (string a, string b) => string.Equals(a, b, StringComparison.Ordinal),
+            _ => false,
+        };
+    }
+
     /// <inheritdoc/>
     public bool Equals(TagValue other)
         => DataType == other.DataType

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Rung.Abstractions;
+using Rung.Core;
 
 namespace Rung.Cli;
 
@@ -13,8 +14,17 @@ public sealed record RungConfig
     /// <summary>设备连接参数。</summary>
     public required DeviceConfig Device { get; init; }
 
-    /// <summary>采集周期，毫秒。</summary>
+    /// <summary>默认采集周期，毫秒。</summary>
     public int PollIntervalMs { get; init; } = 1000;
+
+    /// <summary>
+    /// 各采集组的周期，毫秒。未列出的组用 <see cref="PollIntervalMs"/>。
+    /// 温度 5 秒一次、产量计数 500 ms 一次，就靠这里分开。
+    /// </summary>
+    public Dictionary<string, int>? PollGroupIntervalMs { get; init; }
+
+    /// <summary>断线重连参数。</summary>
+    public ReconnectConfig? Reconnect { get; init; }
 
     /// <summary>点位列表。</summary>
     public required IReadOnlyList<TagConfig> Tags { get; init; }
@@ -47,6 +57,23 @@ public sealed record RungConfig
         Extra = Device.Extra ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
     };
 
+    /// <summary>转换成采集工作者需要的参数。</summary>
+    public DeviceWorkerOptions ToWorkerOptions() => new()
+    {
+        DefaultPollInterval = TimeSpan.FromMilliseconds(PollIntervalMs),
+        PollGroupIntervals = PollGroupIntervalMs?.ToDictionary(
+            static kv => kv.Key,
+            static kv => TimeSpan.FromMilliseconds(kv.Value),
+            StringComparer.Ordinal) ?? new Dictionary<string, TimeSpan>(StringComparer.Ordinal),
+        Reconnect = new ReconnectPolicy
+        {
+            InitialDelay = TimeSpan.FromMilliseconds(Reconnect?.InitialDelayMs ?? 1000),
+            MaxDelay = TimeSpan.FromMilliseconds(Reconnect?.MaxDelayMs ?? 30000),
+            Multiplier = Reconnect?.Multiplier ?? 2.0,
+            JitterRatio = Reconnect?.JitterRatio ?? 0.2,
+        },
+    };
+
     /// <summary>转换成驱动需要的点位定义。</summary>
     public IReadOnlyList<TagDef> ToTagDefs()
         => [.. Tags.Where(static t => t.Enabled).Select(static t => new TagDef
@@ -64,6 +91,22 @@ public sealed record RungConfig
             Description = t.Description,
             Enabled = t.Enabled,
         })];
+}
+
+/// <summary>断线重连配置。</summary>
+public sealed record ReconnectConfig
+{
+    /// <summary>首次重试前的等待，毫秒。</summary>
+    public int InitialDelayMs { get; init; } = 1000;
+
+    /// <summary>退避上限，毫秒。</summary>
+    public int MaxDelayMs { get; init; } = 30000;
+
+    /// <summary>倍增系数。</summary>
+    public double Multiplier { get; init; } = 2.0;
+
+    /// <summary>抖动比例。多台设备同时断线时靠它错开重连。</summary>
+    public double JitterRatio { get; init; } = 0.2;
 }
 
 /// <summary>设备连接配置。</summary>
