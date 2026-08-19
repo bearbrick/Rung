@@ -161,6 +161,33 @@ internal sealed class FakeDriver : IDeviceDriver
     }
 }
 
+/// <summary>按设备标识分发不同的假驱动，用于多设备编排的测试。</summary>
+internal sealed class MultiDeviceFakeFactory : IDeviceDriverFactory
+{
+    private readonly Dictionary<string, FakeDriver> _drivers = new(StringComparer.Ordinal);
+
+    public string Protocol => "fake";
+
+    public string AddressSyntaxHint => "任意字符串";
+
+    /// <summary>取得（必要时创建）某台设备的假驱动，以便注入故障。</summary>
+    public FakeDriver this[string deviceId]
+    {
+        get
+        {
+            if (!_drivers.TryGetValue(deviceId, out var driver))
+            {
+                driver = new FakeDriver(deviceId);
+                _drivers[deviceId] = driver;
+            }
+
+            return driver;
+        }
+    }
+
+    public IDeviceDriver Create(DeviceOptions options) => this[options.DeviceId];
+}
+
 /// <summary>始终交出同一个假驱动实例，方便测试跨重连观察它的状态。</summary>
 internal sealed class FakeDriverFactory(FakeDriver driver) : IDeviceDriverFactory
 {

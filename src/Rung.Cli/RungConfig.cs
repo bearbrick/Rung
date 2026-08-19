@@ -5,16 +5,28 @@ using Rung.Core;
 
 namespace Rung.Cli;
 
-/// <summary>采集配置。MVP 阶段用 JSON 文件，后续会迁到 SQLite + Web UI。</summary>
+/// <summary>
+/// 采集配置。MVP 阶段用 JSON 文件，后续会迁到 SQLite + Web UI。
+/// <para>
+/// 支持两种写法：多设备用 <c>devices</c> 数组；只有一台设备时可以用
+/// <c>device</c> + 顶层 <c>tags</c> 的简写。
+/// </para>
+/// </summary>
 public sealed record RungConfig
 {
     /// <summary>配置结构版本。将来做自动迁移时靠它判断。</summary>
     public int Version { get; init; } = 1;
 
-    /// <summary>设备连接参数。</summary>
-    public required DeviceConfig Device { get; init; }
+    /// <summary>多设备写法。</summary>
+    public IReadOnlyList<DeviceConfig>? Devices { get; init; }
 
-    /// <summary>默认采集周期，毫秒。</summary>
+    /// <summary>单设备简写，与顶层 <see cref="Tags"/> 配合使用。</summary>
+    public DeviceConfig? Device { get; init; }
+
+    /// <summary>单设备简写下的点位列表。</summary>
+    public IReadOnlyList<TagConfig>? Tags { get; init; }
+
+    /// <summary>默认采集周期，毫秒。设备可以各自覆盖。</summary>
     public int PollIntervalMs { get; init; } = 1000;
 
     /// <summary>
@@ -25,9 +37,6 @@ public sealed record RungConfig
 
     /// <summary>断线重连参数。</summary>
     public ReconnectConfig? Reconnect { get; init; }
-
-    /// <summary>点位列表。</summary>
-    public required IReadOnlyList<TagConfig> Tags { get; init; }
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -45,52 +54,46 @@ public sealed record RungConfig
             ?? throw new InvalidDataException($"配置文件 {path} 解析结果为空");
     }
 
-    /// <summary>转换成驱动需要的设备参数。</summary>
-    public DeviceOptions ToDeviceOptions() => new()
+    /// <summary>把两种写法归一成设备列表。</summary>
+    public IReadOnlyList<DeviceConfig> ResolveDevices()
     {
-        DeviceId = Device.DeviceId,
-        Protocol = Device.Protocol,
-        Host = Device.Host,
-        Port = Device.Port,
-        TimeoutMs = Device.TimeoutMs,
-        RetryCount = Device.RetryCount,
-        Extra = Device.Extra ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-    };
+        if (Devices is { Count: > 0 })
+        {
+            return Devices;
+        }
 
-    /// <summary>转换成采集工作者需要的参数。</summary>
-    public DeviceWorkerOptions ToWorkerOptions() => new()
+        if (Device is not null)
+        {
+            return [Device with { Tags = Device.Tags ?? Tags ?? [] }];
+        }
+
+        throw new InvalidDataException("配置里既没有 devices 数组，也没有 device 单设备段");
+    }
+
+    /// <summary>为某台设备生成采集参数，设备级配置优先于全局。</summary>
+    public DeviceWorkerOptions ToWorkerOptions(DeviceConfig device)
     {
-        DefaultPollInterval = TimeSpan.FromMilliseconds(PollIntervalMs),
-        PollGroupIntervals = PollGroupIntervalMs?.ToDictionary(
-            static kv => kv.Key,
-            static kv => TimeSpan.FromMilliseconds(kv.Value),
-            StringComparer.Ordinal) ?? new Dictionary<string, TimeSpan>(StringComparer.Ordinal),
-        Reconnect = new ReconnectPolicy
-        {
-            InitialDelay = TimeSpan.FromMilliseconds(Reconnect?.InitialDelayMs ?? 1000),
-            MaxDelay = TimeSpan.FromMilliseconds(Reconnect?.MaxDelayMs ?? 30000),
-            Multiplier = Reconnect?.Multiplier ?? 2.0,
-            JitterRatio = Reconnect?.JitterRatio ?? 0.2,
-        },
-    };
+        ArgumentNullException.ThrowIfNull(device);
 
-    /// <summary>转换成驱动需要的点位定义。</summary>
-    public IReadOnlyList<TagDef> ToTagDefs()
-        => [.. Tags.Where(static t => t.Enabled).Select(static t => new TagDef
+        var groups = device.PollGroupIntervalMs ?? PollGroupIntervalMs;
+        var reconnect = device.Reconnect ?? Reconnect;
+
+        return new DeviceWorkerOptions
         {
-            Name = t.Name,
-            Address = t.Address,
-            DataType = t.DataType,
-            Length = t.Length,
-            ByteOrder = t.ByteOrder,
-            Scale = t.Scale,
-            Offset = t.Offset,
-            Deadband = t.Deadband,
-            Access = t.Access,
-            PollGroup = t.PollGroup,
-            Description = t.Description,
-            Enabled = t.Enabled,
-        })];
+            DefaultPollInterval = TimeSpan.FromMilliseconds(device.PollIntervalMs ?? PollIntervalMs),
+            PollGroupIntervals = groups?.ToDictionary(
+                static kv => kv.Key,
+                static kv => TimeSpan.FromMilliseconds(kv.Value),
+                StringComparer.Ordinal) ?? new Dictionary<string, TimeSpan>(StringComparer.Ordinal),
+            Reconnect = new ReconnectPolicy
+            {
+                InitialDelay = TimeSpan.FromMilliseconds(reconnect?.InitialDelayMs ?? 1000),
+                MaxDelay = TimeSpan.FromMilliseconds(reconnect?.MaxDelayMs ?? 30000),
+                Multiplier = reconnect?.Multiplier ?? 2.0,
+                JitterRatio = reconnect?.JitterRatio ?? 0.2,
+            },
+        };
+    }
 }
 
 /// <summary>断线重连配置。</summary>
@@ -132,12 +135,54 @@ public sealed record DeviceConfig
 
     /// <summary>协议特有参数，S7 用 rack / slot。</summary>
     public Dictionary<string, string>? Extra { get; init; }
+
+    /// <summary>该设备的点位。</summary>
+    public IReadOnlyList<TagConfig>? Tags { get; init; }
+
+    /// <summary>覆盖全局的采集周期，毫秒。</summary>
+    public int? PollIntervalMs { get; init; }
+
+    /// <summary>覆盖全局的分组周期。</summary>
+    public Dictionary<string, int>? PollGroupIntervalMs { get; init; }
+
+    /// <summary>覆盖全局的重连参数。</summary>
+    public ReconnectConfig? Reconnect { get; init; }
+
+    /// <summary>转换成驱动需要的设备参数。</summary>
+    public DeviceOptions ToDeviceOptions() => new()
+    {
+        DeviceId = DeviceId,
+        Protocol = Protocol,
+        Host = Host,
+        Port = Port,
+        TimeoutMs = TimeoutMs,
+        RetryCount = RetryCount,
+        Extra = Extra ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+    };
+
+    /// <summary>转换成驱动需要的点位定义。</summary>
+    public IReadOnlyList<TagDef> ToTagDefs()
+        => [.. (Tags ?? []).Where(static t => t.Enabled).Select(static t => new TagDef
+        {
+            Name = t.Name,
+            Address = t.Address,
+            DataType = t.DataType,
+            Length = t.Length,
+            ByteOrder = t.ByteOrder,
+            Scale = t.Scale,
+            Offset = t.Offset,
+            Deadband = t.Deadband,
+            Access = t.Access,
+            PollGroup = t.PollGroup,
+            Description = t.Description,
+            Enabled = t.Enabled,
+        })];
 }
 
 /// <summary>点位配置。</summary>
 public sealed record TagConfig
 {
-    /// <summary>业务点位名。</summary>
+    /// <summary>业务点位名，全局唯一。</summary>
     public required string Name { get; init; }
 
     /// <summary>协议地址。</summary>
@@ -158,7 +203,7 @@ public sealed record TagConfig
     /// <summary>线性换算偏移。</summary>
     public double Offset { get; init; }
 
-    /// <summary>死区。</summary>
+    /// <summary>死区。变化小于该值时不向北推送。</summary>
     public double Deadband { get; init; }
 
     /// <summary>读写权限。</summary>

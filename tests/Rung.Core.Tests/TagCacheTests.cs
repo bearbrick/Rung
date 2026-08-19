@@ -134,6 +134,30 @@ public class TagCacheTests
     }
 
     [Fact]
+    public async Task 多台设备并发更新同一个缓存()
+    {
+        // 多设备编排下所有 DeviceWorker 共享一个 TagCache，各自在自己的任务里更新。
+        // 死区基准表若用普通 Dictionary，这里会抛"非并发集合被并发修改"
+        var cache = new TagCache();
+
+        var devices = Enumerable.Range(0, 8).Select(deviceIndex => Task.Run(() =>
+        {
+            TagDef[] tags = [Tag($"dev{deviceIndex}.a"), Tag($"dev{deviceIndex}.b")];
+
+            for (var round = 0; round < 500; round++)
+            {
+                cache.Update($"dev{deviceIndex}", tags, [Value(round), Value(round * 2)]);
+            }
+        }));
+
+        await Task.WhenAll(devices);
+
+        Assert.Equal(16, cache.Count);
+        Assert.True(cache.TryGet("dev7.b", out var snapshot));
+        Assert.Equal(998, snapshot.Value.AsDouble());
+    }
+
+    [Fact]
     public void 快照按名称排序便于展示()
     {
         var cache = new TagCache();

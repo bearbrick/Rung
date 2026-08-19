@@ -9,29 +9,49 @@
 > 断线自己按退避重连、恢复后继续采集，不需要人工重启。
 > 北向输出目前只有控制台，Redis / MQTT / Web UI 还在路上。
 
-## 跑起来
+## 跑起来（不需要 PLC）
+
+仓库自带一个西门子 S7 设备模拟器。开两个终端：
 
 ```bash
-dotnet run --project src/Rung.Cli -- samples/s7-demo.json
+dotnet run --project src/Rung.Simulator -- samples/simulator.json
+```
+
+```bash
+dotnet run --project src/Rung.Cli -- samples/gateway.json
 ```
 
 ```
-已连接，协商 PDU 长度 240 字节
-采集计划：4/4 个点位 → 每轮 1 次请求，上轮耗时 2.0 ms
-  Line1.Oven3.Temp                       235   DB1.DBW0
-  Line1.Oven3.Pressure               1013.25   DB1.DBD4
-  Line1.Oven3.Running                   true   DB1.DBX8.0
-  Line1.Output.Count                  128456   DB1.DBD10
+[line1-oven]  PDU 240 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 0.1 ms
+[line1-robot] PDU 480 字节 · 3 个点位 → 每轮 1 次请求 · 上轮耗时 3.0 ms
+[line2-flaky] PDU 240 字节 · 1 个点位 → 每轮 1 次请求 · 上轮耗时 2.9 ms
+  Line1.Oven.Temp                     239.7   line1-oven/DB1.DBW0
+  Line1.Oven.Pressure                  1013   line1-oven/DB1.DBD4
+  Line1.Oven.Running                  false   line1-oven/DB1.DBX8.0
+  Line1.Robot.Angle                  90.986   line1-robot/DB10.DBD0
 
 持续采集中，Ctrl+C 停止。只打印发生变化的点位。
-13:26:42.185  Line1.Output.Count                       128498
-13:26:42 warn: 设备 line1-plc 通讯中断（连续第 1 次）：对端关闭了连接，00:00:00.88 后重连
-13:26:43 warn: 设备 line1-plc 通讯中断（连续第 2 次）：Connection refused，00:00:02.08 后重连
-13:26:49 info: 设备 line1-plc 已连接，PDU 240 字节，4 个点位编译成 1 次请求
-13:26:49.964  Line1.Output.Count                       128463
+13:44:12.414  Line1.Robot.Angle                        23.152
+13:44:12.509  Line2.Flaky.Counter                          24
+13:44:15 warn: 设备 line2-flaky 通讯中断（连续第 1 次）：对端关闭了连接，00:00:00.52 后重连
+13:44:16 info: 设备 line2-flaky 已连接，PDU 240 字节，1 个点位编译成 1 次请求
 ```
 
 `--once` 采一轮就退出，适合脚本和现场点位验证；`--timeout <秒>` 控制首次连接的等待上限。
+
+## 模拟器
+
+没有真机也能把整条链路验证完，这是 `Rung.Simulator` 存在的理由。
+
+**信号是活的**：`sine` / `ramp` / `counter` / `toggle` / `randomwalk` / `constant`。
+死值只能验证"链路通不通"，会变化的信号才能验证死区过滤、变化推送这些真正会出问题的地方。
+随机游走用固定种子，因而**可复现**——排查时能重放出一模一样的数据序列。
+
+**故障可以注入**：拒绝连接、应答延迟、收发 N 次后断开、每隔若干秒断一次、
+指定 DB 返回"对象不存在"、拒绝写命令。拔网线不可重复，这些开关可以。
+
+**报文编码是独立实现的**，不引用 Rung 的任何代码。两边同源的话，一个写错的偏移量
+会同时体现在模拟器和被测代码上，测试全绿但真机一读就错。独立实现才能互为对照。
 
 ## 设计要点
 
@@ -64,11 +84,13 @@ src/
   Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
   Rung.Core/               采集内核：连接生命周期、退避重连、调度、缓存、写队列
   Rung.Cli/                命令行入口（MVP 的可执行形态）
+  Rung.Simulator/          西门子 S7 设备模拟器：活信号 + 故障注入
 samples/                   配置文件示例
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
   Rung.Drivers.S7.Tests/   进程内假 S7 设备 + 端到端链路测试
-  Rung.Core.Tests/         可编程假驱动 + 调度与重连测试
+  Rung.Core.Tests/         可编程假驱动 + 调度、重连、多设备编排测试
+  Rung.Simulator.Tests/    信号源与地址解析
 third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
@@ -82,9 +104,8 @@ dotnet test
 需要 .NET 10 SDK。测试走 Microsoft.Testing.Platform（.NET 10 起 `dotnet test` 的默认路径），
 运行器在 `global.json` 中声明。
 
-测试不需要真实 PLC：`Rung.Drivers.S7.Tests` 里有一个进程内的假 S7 设备，
-它的报文构造是独立于 Rung 另写一遍的，因此解析器和编码器互为对照——
-如果两边同源，测试就只能证明代码和自己一致。
+测试不需要真实 PLC：所有端到端用例都跑在 `Rung.Simulator` 上，
+它的报文构造独立于 Rung 另写一遍，因此解析器和编码器互为对照。
 
 ## 路线图
 
@@ -95,7 +116,8 @@ dotnet test
 - [x] `Rung.Drivers.S7`：异步传输层、连接管理、读写执行
 - [x] CLI：配置文件驱动的采集与打印
 - [x] 采集内核：退避重连、按组独立调度、点位缓存、写命令插队、死区过滤
-- [ ] 多设备编排：一个进程管多台设备
+- [x] 多设备编排：一个进程管多台设备，按业务名路由写命令
+- [x] 设备模拟器：活信号 + 故障注入，无需真机即可验证全链路
 - [ ] 北向输出：Redis / REST / SSE / MQTT
 - [ ] SQLite 配置存储 + Excel 导入导出
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus

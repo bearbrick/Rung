@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>rung-sim</AssemblyName>
+    <RootNamespace>Rung.Simulator</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    刻意不引用 Rung 的任何项目。
+    模拟器负责"编码"，Rung 负责"解码"，两边必须是独立实现——
+    否则测试只能证明代码和自己一致，证明不了它跟 S7 协议一致。
+    副作用是它可以单独分发：别人拿到一个 rung-sim 就能试用，不需要 PLC。
+  -->
+
+</Project>

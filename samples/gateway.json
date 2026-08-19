@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "pollIntervalMs": 1000,
+  "pollGroupIntervalMs": {
+    "fast": 300,
+    "slow": 5000
+  },
+  "reconnect": {
+    "initialDelayMs": 1000,
+    "maxDelayMs": 30000,
+    "jitterRatio": 0.2
+  },
+  "devices": [
+    {
+      "deviceId": "line1-oven",
+      "protocol": "s7",
+      "host": "127.0.0.1",
+      "port": 10102,
+      "extra": { "rack": "0", "slot": "1" },
+      "tags": [
+        { "name": "Line1.Oven.Temp", "address": "DB1.DBW0", "dataType": "Int16",
+          "scale": 0.1, "deadband": 0.5, "pollGroup": "slow", "description": "炉温 ℃" },
+        { "name": "Line1.Oven.Pressure", "address": "DB1.DBD4", "dataType": "Float32",
+          "deadband": 0.3, "description": "腔压 hPa" },
+        { "name": "Line1.Oven.Running", "address": "DB1.DBX8.0", "dataType": "Bool" },
+        { "name": "Line1.Oven.Count", "address": "DB1.DBD10", "dataType": "Int32",
+          "pollGroup": "fast", "description": "产量计数" },
+        { "name": "Line1.Oven.Setpoint", "address": "DB1.DBW20", "dataType": "Int16",
+          "scale": 0.1, "access": "ReadWrite", "pollGroup": "slow", "description": "温度设定值" }
+      ]
+    },
+    {
+      "deviceId": "line1-robot",
+      "protocol": "s7",
+      "host": "127.0.0.1",
+      "port": 10103,
+      "extra": { "rack": "0", "slot": "1" },
+      "pollIntervalMs": 500,
+      "tags": [
+        { "name": "Line1.Robot.Angle", "address": "DB10.DBD0", "dataType": "Float32", "deadband": 5 },
+        { "name": "Line1.Robot.Cycles", "address": "DB10.DBD4", "dataType": "Int32" },
+        { "name": "Line1.Robot.Gripper", "address": "M0.0", "dataType": "Bool" }
+      ]
+    },
+    {
+      "deviceId": "line2-flaky",
+      "protocol": "s7",
+      "host": "127.0.0.1",
+      "port": 10104,
+      "extra": { "rack": "0", "slot": "1" },
+      "reconnect": { "initialDelayMs": 500, "maxDelayMs": 4000, "jitterRatio": 0.2 },
+      "tags": [
+        { "name": "Line2.Flaky.Counter", "address": "DB1.DBW0", "dataType": "Int16" }
+      ]
+    }
+  ]
+}

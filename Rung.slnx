@@ -5,10 +5,12 @@
     <Project Path="src/Rung.Core/Rung.Core.csproj" />
     <Project Path="src/Rung.Drivers.S7/Rung.Drivers.S7.csproj" />
     <Project Path="src/Rung.Protocols.S7/Rung.Protocols.S7.csproj" />
+    <Project Path="src/Rung.Simulator/Rung.Simulator.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Rung.Core.Tests/Rung.Core.Tests.csproj" />
     <Project Path="tests/Rung.Drivers.S7.Tests/Rung.Drivers.S7.Tests.csproj" />
     <Project Path="tests/Rung.Protocols.S7.Tests/Rung.Protocols.S7.Tests.csproj" />
+    <Project Path="tests/Rung.Simulator.Tests/Rung.Simulator.Tests.csproj" />
   </Folder>
 </Solution>

@@ -12,8 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Rung.Drivers.S7\Rung.Drivers.S7.csproj" />
-    <ProjectReference Include="..\..\src\Rung.Cli\Rung.Cli.csproj" />
     <ProjectReference Include="..\..\src\Rung.Simulator\Rung.Simulator.csproj" />
   </ItemGroup>
 

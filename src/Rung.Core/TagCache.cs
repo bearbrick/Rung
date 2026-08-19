@@ -21,8 +21,19 @@ public sealed class TagCache
 {
     private readonly ConcurrentDictionary<string, TagSnapshot> _current = new(StringComparer.Ordinal);
 
-    /// <summary>仅由采集线程访问，用于死区判定，不参与并发。</summary>
-    private readonly Dictionary<string, TagValue> _lastPublished = new(StringComparer.Ordinal);
+    /// <summary>
+    /// 死区判定的基准值：每个点位最近一次推送出去的读数。
+    /// <para>
+    /// 必须是并发字典。多设备编排下所有 <see cref="DeviceWorker"/> 共享同一个缓存，
+    /// 各自在自己的任务里调用 <see cref="Update"/>——曾经"只有一个采集线程"的假设，
+    /// 在加入 <see cref="GatewayHost"/> 的那一刻就失效了。
+    /// </para>
+    /// <para>
+    /// 无需跨键的一致性：<see cref="GatewayHost"/> 强制业务点位名全局唯一，
+    /// 因此两台设备不会写同一个键。
+    /// </para>
+    /// </summary>
+    private readonly ConcurrentDictionary<string, TagValue> _lastPublished = new(StringComparer.Ordinal);
 
     /// <summary>当前缓存的点位数量。</summary>
     public int Count => _current.Count;

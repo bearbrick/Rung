@@ -1,5 +1,6 @@
 using System.Globalization;
-using Rung.Cli;
+using Rung.Simulator;
+using Program = Rung.Cli.Program;
 using Xunit;
 
 namespace Rung.Drivers.S7.Tests;
@@ -52,9 +53,9 @@ public class CliSmokeTests : IDisposable
     [Fact]
     public async Task 从配置文件到打印出值的完整链路()
     {
-        await using var server = new FakeS7Server();
-        server.Poke(0x84, 1, 0, 0x09, 0x2E);       // 2350，倍率 0.1 后是 235
-        server.Poke(0x84, 1, 4, 0b0000_0100);      // 第 2 位置起
+        await using var server = new S7SimulatorServer(new SimulatedDeviceConfig { Port = 0 });
+        server.Poke("DB1.DBW0", 0x09, 0x2E);   // 2350，倍率 0.1 后是 235
+        server.Poke("DB1.DBB4", 0b0000_0100);  // 第 2 位置起
 
         var output = new StringWriter();
 
@@ -64,8 +65,8 @@ public class CliSmokeTests : IDisposable
         var text = output.ToString();
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("已连接，协商 PDU 长度 240 字节", text, StringComparison.Ordinal);
-        Assert.Contains("2/2 个点位 → 每轮 1 次请求", text, StringComparison.Ordinal);
+        Assert.Contains("[fake-plc] PDU 240 字节", text, StringComparison.Ordinal);
+        Assert.Contains("2 个点位 → 每轮 1 次请求", text, StringComparison.Ordinal);
         Assert.Contains("235", text, StringComparison.Ordinal);
         Assert.Contains("true", text, StringComparison.Ordinal);
     }
@@ -73,7 +74,7 @@ public class CliSmokeTests : IDisposable
     [Fact]
     public async Task 配置里的坏点位被显式报出来而不是静默跳过()
     {
-        await using var server = new FakeS7Server();
+        await using var server = new S7SimulatorServer(new SimulatedDeviceConfig { Port = 0 });
         var output = new StringWriter();
 
         var configPath = WriteConfigCore(server.Port, """
@@ -96,7 +97,7 @@ public class CliSmokeTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.Contains("! 配置问题 typo", text, StringComparison.Ordinal);
-        Assert.Contains("1/2 个点位", text, StringComparison.Ordinal);
+        Assert.Contains("1 个点位 → 每轮 1 次请求", text, StringComparison.Ordinal);
         Assert.Contains("ConfigError", text, StringComparison.Ordinal);
     }
 
@@ -118,7 +119,7 @@ public class CliSmokeTests : IDisposable
 
         Assert.Equal(1, exitCode);
         Assert.Contains("未能完成首次采集", text, StringComparison.Ordinal);
-        Assert.Contains("最后一次错误", text, StringComparison.Ordinal);
+        Assert.Contains("fake-plc", text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -58,6 +58,10 @@ internal static partial class Log
     public static partial void TagWriteFailed(
         ILogger logger, Exception exception, string deviceId, string tagName);
 
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Critical,
+        Message = "设备 {DeviceId} 的工作循环意外退出，该设备将停止采集")]
+    public static partial void DeviceLoopCrashed(ILogger logger, Exception exception, string deviceId);
+
     [LoggerMessage(EventId = 3000, Level = LogLevel.Error,
         Message = "北向输出 {SinkName} 推送失败，采集不受影响")]
     public static partial void SinkFailed(ILogger logger, Exception exception, string sinkName);

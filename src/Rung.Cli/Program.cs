@@ -62,7 +62,8 @@ public static class Program
             output.WriteLine("已停止。");
             return 0;
         }
-        catch (Exception ex) when (ex is RungException or IOException or InvalidDataException)
+        catch (Exception ex) when (ex is RungException or IOException or InvalidDataException
+                                       or System.Text.Json.JsonException)
         {
             output.WriteLine($"错误：{ex.Message}");
             return 1;
@@ -77,13 +78,7 @@ public static class Program
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        var deviceOptions = config.ToDeviceOptions();
-
-        if (!string.Equals(deviceOptions.Protocol, "s7", StringComparison.OrdinalIgnoreCase))
-        {
-            output.WriteLine($"当前版本只支持 s7 协议，配置里是 {deviceOptions.Protocol}");
-            return 1;
-        }
+        var devices = config.ResolveDevices();
 
         using var loggerFactory = LoggerFactory.Create(builder => builder
             .SetMinimumLevel(quiet ? LogLevel.Warning : LogLevel.Information)
@@ -94,29 +89,31 @@ public static class Program
             }));
 
         var cache = new TagCache();
-        var tags = config.ToTagDefs();
 
         // --once 只要一轮结果，不必让输出被逐条变化刷屏
         IReadOnlyList<ITagSink> sinks = once ? [] : [new ConsoleTagSink(output)];
 
-        await using var worker = new DeviceWorker(
-            new S7DriverFactory(),
-            deviceOptions,
-            tags,
-            cache,
-            sinks,
-            config.ToWorkerOptions(),
-            loggerFactory.CreateLogger<DeviceWorker>());
+        await using var host = new GatewayHost([new S7DriverFactory()], cache, sinks, loggerFactory);
 
-        output.WriteLine($"正在连接 {deviceOptions.Host}:{deviceOptions.Port} …");
+        foreach (var device in devices)
+        {
+            host.AddDevice(device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device));
+            output.WriteLine($"注册设备 {device.DeviceId} → {device.Host}:{device.Port}（{device.Protocol}）");
+        }
 
         using var scope = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var run = worker.RunAsync(scope.Token);
+        var run = host.RunAsync(scope.Token);
 
         try
         {
-            await WaitForFirstPollAsync(worker, startupTimeout, scope.Token).ConfigureAwait(false);
-            PrintDeviceSummary(worker, tags.Count, output);
+            await WaitForFirstPollAsync(host, startupTimeout, scope.Token).ConfigureAwait(false);
+
+            output.WriteLine();
+            foreach (var status in host.DeviceStatuses)
+            {
+                PrintDeviceSummary(status, output);
+            }
+
             PrintValues(cache, output);
 
             if (once)
@@ -147,20 +144,22 @@ public static class Program
     /// </para>
     /// </summary>
     private static async Task WaitForFirstPollAsync(
-        DeviceWorker worker,
+        GatewayHost host,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + timeout;
 
-        while (worker.Status.LastSuccessUtc is null)
+        while (host.DeviceStatuses.Any(static status => status.LastSuccessUtc is null))
         {
             if (DateTime.UtcNow >= deadline)
             {
-                var reason = worker.Status.LastError ?? "未知原因";
+                var pending = host.DeviceStatuses
+                    .Where(static status => status.LastSuccessUtc is null)
+                    .Select(static status => $"{status.DeviceId}（{status.LastError ?? "未知原因"}）");
+
                 throw new RungException(
-                    $"{timeout.TotalSeconds:F0} 秒内未能完成首次采集（连续失败 "
-                    + $"{worker.Status.ConsecutiveFailures} 次）。最后一次错误：{reason}");
+                    $"{timeout.TotalSeconds:F0} 秒内以下设备未能完成首次采集：{string.Join("、", pending)}");
             }
 
             await Task.Delay(50, cancellationToken).ConfigureAwait(false);
@@ -178,13 +177,11 @@ public static class Program
                 : TimeSpan.FromSeconds(30);
     }
 
-    private static void PrintDeviceSummary(DeviceWorker worker, int tagCount, TextWriter output)
+    private static void PrintDeviceSummary(DeviceStatus status, TextWriter output)
     {
-        var status = worker.Status;
-
-        output.WriteLine($"已连接，协商 PDU 长度 {status.NegotiatedPduLength} 字节");
         output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"采集计划：{status.ActiveTagCount}/{tagCount} 个点位 → 每轮 {status.RequestCount} 次请求，"
+            $"[{status.DeviceId}] PDU {status.NegotiatedPduLength} 字节 · "
+            + $"{status.ActiveTagCount} 个点位 → 每轮 {status.RequestCount} 次请求 · "
             + $"上轮耗时 {status.LastPollDuration.TotalMilliseconds:F1} ms"));
 
         foreach (var issue in status.Issues)
@@ -207,7 +204,7 @@ public static class Program
         {
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  {snapshot.Tag.Name.PadRight(nameWidth)}  {ConsoleTagSink.Format(snapshot.Value),20}"
-                + $"   {snapshot.Tag.Address}"));
+                + $"   {snapshot.DeviceId}/{snapshot.Tag.Address}"));
         }
     }
 
@@ -229,7 +226,7 @@ public static class Program
             Rung — 轻量级 PLC 数据采集网关
 
             用法：
-              rung <配置文件.json>          持续采集，断线自动重连，Ctrl+C 停止
+              rung <配置文件.json>          持续采集所有设备，断线自动重连，Ctrl+C 停止
               rung <配置文件.json> --once   采集一轮后退出
               rung <配置文件.json> --quiet  只打印警告以上级别的日志
               rung <配置文件.json> --timeout <秒>  首次连接的等待上限，缺省 30
