@@ -1,0 +1,9 @@
+# name:      read-request-single-db1-dbd20
+# source:    spec
+# direction: request
+# note:      读 DB1.DBD20 的 4 个字节。地址字段是位地址 20*8=160=0x0000a0，不是字节偏移
+03 00 00 1f
+02 f0 80
+32 01 00 00  00 02  00 0e  00 00
+04 01
+12 0a 10 02  00 04  00 01  84  00 00 a0

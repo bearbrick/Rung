@@ -1,0 +1,9 @@
+# name:      cotp-connect-request-rack1-slot2
+# source:    spec
+# direction: request
+# note:      机架号必须左移 5 位。1*32+2 = 0x22。写成 rack+slot 是最常见的移植错误
+03 00 00 16
+11 e0 00 00 00 01 00
+c0 01 0a
+c1 02 01 00
+c2 02 01 22

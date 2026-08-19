@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Rung.Protocols.S7</PackageId>
+    <Description>西门子 S7comm 协议的纯编解码实现：地址解析、报文组包、响应解析。不含任何 IO，传输层由 Rung.Drivers.S7 提供。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,35 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx}]
+indent_size = 4
+dotnet_sort_system_directives_first = true
+csharp_new_line_before_open_brace = all
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+dotnet_style_readonly_field = true:warning
+csharp_prefer_braces = true:warning
+csharp_style_prefer_pattern_matching = true:suggestion
+
+# 协议层大量使用位运算和魔数偏移，这是报文格式决定的，不是坏味道
+[src/Rung.Protocols.*/**.cs]
+dotnet_diagnostic.CA1305.severity = none
+
+# 测试方法用中文命名，可读性远胜 Should_Xxx_When_Yyy
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+[*.{csproj,props,targets,json,yml,yaml}]
+indent_size = 2
+
+[*.{md,hex}]
+trim_trailing_whitespace = false

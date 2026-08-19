@@ -1,0 +1,10 @@
+# name:      read-response-octet-string
+# source:    spec
+# direction: response
+# note:      传输尺寸 0x09 (OCTET STRING) 的长度字段以“字节”计，不是位。
+#            照搬 0x04 的除 8 逻辑会得到 0 字节——这是 S7 解析最经典的坑
+03 00 00 1d
+02 f0 80
+32 03 00 00  00 07  00 02  00 08  00 00
+04 01
+ff 09 00 04  de ad be ef

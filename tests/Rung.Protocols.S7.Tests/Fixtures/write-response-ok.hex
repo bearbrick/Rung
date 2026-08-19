@@ -1,0 +1,9 @@
+# name:      write-response-ok
+# source:    spec
+# direction: response
+# note:      写成功。数据段每项只有一个字节的返回码
+03 00 00 16
+02 f0 80
+32 03 00 00  00 09  00 02  00 01  00 00
+05 01
+ff

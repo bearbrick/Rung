@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Rung.Abstractions</PackageId>
+    <Description>Rung 采集网关的驱动契约层。第三方按此接口实现自己的设备驱动即可接入 Rung。</Description>
+    <PackageTags>PLC;IoT;Gateway;Modbus;S7</PackageTags>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+</Project>

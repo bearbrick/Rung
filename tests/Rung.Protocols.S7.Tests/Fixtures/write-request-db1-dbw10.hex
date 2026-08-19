@@ -1,0 +1,10 @@
+# name:      write-request-db1-dbw10
+# source:    spec
+# direction: request
+# note:      往 DB1.DBW10 写 1234 (0x04d2)。数据段长度 0x0010 = 16，以“位”计
+03 00 00 25
+02 f0 80
+32 01 00 00  00 09  00 0e  00 06
+05 01
+12 0a 10 02  00 02  00 01  84  00 00 50
+00 04 00 10  04 d2

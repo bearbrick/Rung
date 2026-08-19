@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Rung.Abstractions/Rung.Abstractions.csproj" />
+    <Project Path="src/Rung.Protocols.S7/Rung.Protocols.S7.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Rung.Protocols.S7.Tests/Rung.Protocols.S7.Tests.csproj" />
+  </Folder>
+</Solution>

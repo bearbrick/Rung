@@ -1,0 +1,10 @@
+# name:      read-request-two-items-mixed
+# source:    spec
+# direction: request
+# note:      MW100（2 字节，M 区 0x83，位地址 800=0x000320）+ DB2.DBX0.3（单个位，传输尺寸 0x01）
+03 00 00 2b
+02 f0 80
+32 01 00 00  00 03  00 1a  00 00
+04 02
+12 0a 10 02  00 02  00 00  83  00 03 20
+12 0a 10 01  00 01  00 02  84  00 00 03

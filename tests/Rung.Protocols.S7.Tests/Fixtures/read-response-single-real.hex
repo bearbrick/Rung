@@ -1,0 +1,9 @@
+# name:      read-response-single-real
+# source:    spec
+# direction: response
+# note:      单项 4 字节，值为 REAL 42.5 = 0x422a0000。传输尺寸 0x04，长度 0x0020 以“位”计
+03 00 00 1d
+02 f0 80
+32 03 00 00  00 02  00 02  00 08  00 00
+04 01
+ff 04 00 20  42 2a 00 00

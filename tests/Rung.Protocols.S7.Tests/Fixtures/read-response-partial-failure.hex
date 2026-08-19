@@ -1,0 +1,11 @@
+# name:      read-response-partial-failure
+# source:    spec
+# direction: response
+# note:      第一项返回 0x0a（对象不存在，通常是 DB 号写错），不携带数据也不补填充；
+#            第二项正常。单点失败绝不能中断整批采集
+03 00 00 1f
+02 f0 80
+32 03 00 00  00 06  00 02  00 0a  00 00
+04 02
+0a 00 00 00
+ff 04 00 10  12 34

@@ -1,0 +1,9 @@
+# name:      read-response-single-bit
+# source:    spec
+# direction: response
+# note:      单个位。传输尺寸 0x03，长度 1（位），向上取整占 1 字节
+03 00 00 1a
+02 f0 80
+32 03 00 00  00 08  00 02  00 05  00 00
+04 01
+ff 03 00 01  01

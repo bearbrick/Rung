@@ -1,0 +1,8 @@
+# name:      setup-communication-response-240
+# source:    spec
+# direction: response
+# note:      设备把 PDU 长度砍到 240（S7-300 的典型协商结果）。协商值在偏移 25-26
+03 00 00 1b
+02 f0 80
+32 03 00 00  00 01  00 08  00 00  00 00
+f0 00  00 01  00 01  00 f0
