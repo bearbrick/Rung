@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "device": {
+    "deviceId": "line1-plc",
+    "protocol": "s7",
+    "host": "192.168.0.1",
+    "port": 102,
+    "timeoutMs": 3000,
+    "extra": {
+      "rack": "0",
+      "slot": "1"
+    }
+  },
+  "pollIntervalMs": 1000,
+  "tags": [
+    {
+      "name": "Line1.Oven3.Temp",
+      "address": "DB1.DBW0",
+      "dataType": "Int16",
+      "scale": 0.1,
+      "description": "3号炉温度，PLC 存放大 10 倍的整数"
+    },
+    {
+      "name": "Line1.Oven3.Pressure",
+      "address": "DB1.DBD4",
+      "dataType": "Float32",
+      "description": "腔压"
+    },
+    {
+      "name": "Line1.Oven3.Running",
+      "address": "DB1.DBX8.0",
+      "dataType": "Bool",
+      "description": "运行状态"
+    },
+    {
+      "name": "Line1.Output.Count",
+      "address": "DB1.DBD10",
+      "dataType": "Int32",
+      "pollGroup": "fast",
+      "description": "产量计数"
+    }
+  ]
+}

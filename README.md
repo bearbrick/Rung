@@ -5,8 +5,25 @@
 把西门子 S7、三菱 MC、欧姆龙 FINS、Modbus 设备的点位可视化配置好，
 采集到的数据通过 REST、MQTT 或 Redis 供上层系统使用。单文件部署，无外部依赖。
 
-> **状态：v0.1 开发中。** 当前仓库包含驱动契约层和 S7 协议编解码层，
-> 尚不能独立运行。路线图见下方。
+> **状态：v0.1 MVP。** S7 链路已经打通——配置文件指向一台西门子 PLC，
+> 就能把点位值采下来。采集调度、北向输出、Web UI 还在路上，路线图见下方。
+
+## 跑起来
+
+```bash
+dotnet run --project src/Rung.Cli -- samples/s7-demo.json
+```
+
+```
+已连接，协商 PDU 长度 240 字节
+采集计划：4 个点位 → 1 次请求，每轮取回 14 字节
+  Line1.Oven3.Temp                       235   DB1.DBW0
+  Line1.Oven3.Pressure               1013.25   DB1.DBD4
+  Line1.Oven3.Running                   true   DB1.DBX8.0
+  Line1.Output.Count                  128456   DB1.DBD10
+```
+
+加 `--once` 采一轮就退出，适合脚本和现场点位验证。
 
 ## 设计要点
 
@@ -31,8 +48,12 @@ FluentModbus，S7 / MC / FINS 走自己的移植实现。不把身家压在任�
 src/
   Rung.Abstractions/       驱动契约层。第三方按此接口实现驱动即可接入
   Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
+  Rung.Drivers.S7/         S7 驱动：异步传输、连接管理、读写执行
+  Rung.Cli/                命令行入口（MVP 的可执行形态）
+samples/                   配置文件示例
 tests/
   Rung.Protocols.S7.Tests/ 报文夹具 + 字节级断言
+  Rung.Drivers.S7.Tests/   进程内假 S7 设备 + 端到端链路测试
 third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
@@ -46,13 +67,19 @@ dotnet test
 需要 .NET 10 SDK。测试走 Microsoft.Testing.Platform（.NET 10 起 `dotnet test` 的默认路径），
 运行器在 `global.json` 中声明。
 
+测试不需要真实 PLC：`Rung.Drivers.S7.Tests` 里有一个进程内的假 S7 设备，
+它的报文构造是独立于 Rung 另写一遍的，因此解析器和编码器互为对照——
+如果两边同源，测试就只能证明代码和自己一致。
+
 ## 路线图
 
 - [x] 驱动契约层 `IDeviceDriver` / `TagDef` / `TagValue`
 - [x] S7 协议编解码 + 报文夹具测试
 - [x] 批量合并算法：按地址连续性合并请求，按 PDU 上限切分
-- [ ] 值解码器：字节序（ABCD/CDAB/BADC/DCBA）、线性换算、S7 STRING 头部
-- [ ] `Rung.Drivers.S7`：异步传输层、连接管理、重连状态机
+- [x] 值编解码：字节序（ABCD/CDAB/BADC/DCBA）、线性换算、S7 STRING
+- [x] `Rung.Drivers.S7`：异步传输层、连接管理、读写执行
+- [x] CLI：配置文件驱动的采集与打印
+- [ ] 重连状态机：指数退避，不把 PLC 的连接资源占满
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
 - [ ] `Rung.Core`：SQLite 配置存储、采集调度、点位缓存、写命令队列
 - [ ] 北向输出：Redis / REST / SSE / MQTT

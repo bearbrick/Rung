@@ -187,8 +187,28 @@ public ref struct S7ReadResultCursor
     /// <returns>还有数据项时返回 true。</returns>
     public bool TryReadNext(out S7ReturnCode returnCode, out ReadOnlySpan<byte> data)
     {
+        if (!TryReadNext(out returnCode, out var offset, out var length))
+        {
+            data = default;
+            return false;
+        }
+
+        data = _frame.Slice(offset, length);
+        return true;
+    }
+
+    /// <summary>
+    /// 读出下一个数据项，以相对整帧的偏移量返回其数据位置。
+    /// <para>
+    /// 驱动层用这个重载：<see cref="ReadOnlySpan{T}"/> 不能跨越 <c>await</c> 存活，
+    /// 而偏移量可以，于是"先收齐整帧、再逐个点位解码"这条路径才写得出来。
+    /// </para>
+    /// </summary>
+    public bool TryReadNext(out S7ReturnCode returnCode, out int dataOffset, out int dataLength)
+    {
         returnCode = S7ReturnCode.Reserved;
-        data = default;
+        dataOffset = 0;
+        dataLength = 0;
 
         if (_consumed >= ItemCount)
         {
@@ -213,6 +233,7 @@ public ref struct S7ReadResultCursor
             return true;
         }
 
+
         // 长度字段的单位随传输尺寸变化。这个换算搞错就会读出长度差 8 倍的数据，
         // 而且往往表现为"偶尔读到脏值"，是最难查的一类问题
         var byteLength = S7Protocol.IsBitCountedLength(transportSize)
@@ -225,7 +246,8 @@ public ref struct S7ReadResultCursor
                 $"响应在第 {_consumed} 项处截断：声明 {byteLength} 字节，缓冲区只剩 {_frame.Length - _offset} 字节");
         }
 
-        data = _frame.Slice(_offset, byteLength);
+        dataOffset = _offset;
+        dataLength = byteLength;
         _offset += byteLength;
 
         // 除最后一项外，奇数长度的数据后面补一个填充字节

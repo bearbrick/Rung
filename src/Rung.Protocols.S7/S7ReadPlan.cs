@@ -57,6 +57,7 @@ public sealed class S7ReadPlan : IReadPlan
         Locations = locations;
         Issues = issues;
         NegotiatedPduLength = negotiatedPduLength;
+        TagIndexesByRequest = BuildReverseIndex(requests.Count, locations);
     }
 
     /// <inheritdoc/>
@@ -76,6 +77,15 @@ public sealed class S7ReadPlan : IReadPlan
 
     /// <summary>编译该计划时使用的协商 PDU 长度。设备重连后若协商值变化，必须重新编译。</summary>
     public int NegotiatedPduLength { get; }
+
+    /// <summary>
+    /// 每次请求覆盖了哪些点位，按请求下标索引。
+    /// <para>
+    /// 采集时收到一帧响应就立刻解出这一批点位，不必回头扫描全部 Locations——
+    /// 上千点位时这个反向索引省掉的是每轮 O(点位数 × 请求数) 的空转。
+    /// </para>
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<int>> TagIndexesByRequest { get; }
 
     /// <summary>实际参与采集的点位数。</summary>
     public int ActiveTagCount => Tags.Count - Issues.Count;
@@ -99,5 +109,33 @@ public sealed class S7ReadPlan : IReadPlan
 
             return total;
         }
+    }
+
+    private static int[][] BuildReverseIndex(
+        int requestCount,
+        IReadOnlyList<S7TagLocation> locations)
+    {
+        var buckets = new List<int>[requestCount];
+        for (var i = 0; i < requestCount; i++)
+        {
+            buckets[i] = [];
+        }
+
+        for (var tagIndex = 0; tagIndex < locations.Count; tagIndex++)
+        {
+            var location = locations[tagIndex];
+            if (location.IsValid)
+            {
+                buckets[location.RequestIndex].Add(tagIndex);
+            }
+        }
+
+        var result = new int[requestCount][];
+        for (var i = 0; i < requestCount; i++)
+        {
+            result[i] = [.. buckets[i]];
+        }
+
+        return result;
     }
 }

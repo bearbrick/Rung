@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>rung</AssemblyName>
+    <RootNamespace>Rung.Cli</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Drivers.S7\Rung.Drivers.S7.csproj" />
+  </ItemGroup>
+
+</Project>

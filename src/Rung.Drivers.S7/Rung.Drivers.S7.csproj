@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Rung.Drivers.S7</PackageId>
+    <Description>西门子 S7 驱动：异步传输层、连接管理、读写执行。协议编解码由 Rung.Protocols.S7 提供。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Protocols.S7\Rung.Protocols.S7.csproj" />
+  </ItemGroup>
+
+</Project>
