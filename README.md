@@ -186,6 +186,15 @@ third_party/IoTClient/     上游溯源与许可证
 docs/                      设计与操作文档
 ```
 
+## 部署
+
+```bash
+./scripts/publish.sh linux-x64
+```
+
+产出一个可执行文件加 `wwwroot`，**目标机不需要装 .NET**——离线内网交付时这点很关键。
+配套的 systemd 单元、容器镜像、目录与端口约定见 [`docs/deploy.md`](docs/deploy.md)。
+
 ## 开发
 
 ```bash
@@ -215,7 +224,7 @@ dotnet test
 - [ ] SQLite 配置存储 + Excel 导入导出（现在还是 JSON 文件）
 - [x] `Rung.Drivers.Modbus`：基于 FluentModbus，支持多从站与四种地址写法
 - [x] Web UI：点位实时值、设备状况、手动读写
-- [ ] 打包：Docker 多架构镜像 + Linux 单文件自包含发布
+- [x] 打包：Linux 单文件自包含发布 + systemd 单元 + Dockerfile
 
 ## 许可
 

@@ -1,0 +1,53 @@
+# Rung 采集网关的 systemd 单元。
+#
+# 安装：
+#   sudo cp deploy/rung.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now rung
+
+[Unit]
+Description=Rung PLC 数据采集网关
+Documentation=https://github.com/bearbrick/Rung
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# ASP.NET Core 默认不发 sd_notify，用 exec 而不是 notify，
+# 否则 systemd 会一直等一个永远不来的就绪信号直到超时
+Type=exec
+User=rung
+Group=rung
+WorkingDirectory=/opt/rung
+ExecStart=/opt/rung/rung-host --ConfigPath /etc/rung/rung.json
+
+# 网关掉了产线就没数据了，无条件拉起。
+# RestartSec 给 5 秒是为了避免配置写错时疯狂重启刷满日志
+Restart=always
+RestartSec=5
+
+# 停机时给采集循环时间把当前这轮跑完并优雅断开 PLC 连接
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+Environment=DOTNET_gcServer=0
+Environment=Logging__LogLevel__Default=Information
+
+# 采集网关只需要读配置、写数据目录和日志，其余一律收紧。
+# 它跑在产线网里，是攻击面最靠前的一环
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/rung /var/log/rung
+
+# 默认端口 5580 是非特权端口，不需要 CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+web/node_modules/
+web/dist/
+src/Rung.Host/wwwroot/assets/
+src/Rung.Host/wwwroot/index.html
+tests/
+docs/
+samples/
+.git/
+.github/

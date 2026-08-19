@@ -7,6 +7,13 @@ using Rung.Host;
 using Rung.Host.Endpoints;
 using Rung.Sinks.Redis;
 
+// 容器健康检查探针。aspnet 基础镜像里没有 curl/wget，
+// 与其为了探活多装一个包，不如让程序自己探自己
+if (args.Contains("--healthcheck", StringComparer.Ordinal))
+{
+    return await HealthProbe.RunAsync(args).ConfigureAwait(false);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 端口挑一个冷门的四位数：5000 是 Kestrel 默认、8080 到处都是、9090 归 Prometheus。
