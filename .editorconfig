@@ -33,3 +33,11 @@ indent_size = 2
 
 [*.{md,hex}]
 trim_trailing_whitespace = false
+
+# EF Core 生成的迁移文件。生成代码不该按手写代码的规范要求——
+# 每次 dotnet ef migrations add 之后都去手工调格式，既没意义也一定会忘
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.CS1591.severity = none

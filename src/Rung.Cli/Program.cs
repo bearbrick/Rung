@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Rung.Abstractions;
 using Rung.Configuration;
+using Rung.Configuration.Storage;
 using Rung.Core;
 using Rung.Drivers.Modbus;
 using Rung.Drivers.S7;
@@ -43,12 +44,22 @@ public static class Program
             return args.Length == 0 ? 1 : 0;
         }
 
+        if (string.Equals(args[0], "config", StringComparison.Ordinal))
+        {
+            return await ConfigCommands.RunAsync(args, output, cancellationToken).ConfigureAwait(false);
+        }
+
         var configPath = args[0];
         var once = args.Contains("--once", StringComparer.Ordinal);
         var quiet = args.Contains("--quiet", StringComparer.Ordinal);
         var startupTimeout = ParseTimeout(args);
 
-        if (!File.Exists(configPath))
+        // --db 指向 SQLite，其余按 JSON 文件处理
+        IConfigStore store = string.Equals(configPath, "--db", StringComparison.Ordinal)
+            ? new SqliteConfigStore(args.Length > 1 ? args[1] : "rung.db")
+            : new JsonConfigStore(configPath);
+
+        if (store is JsonConfigStore && !File.Exists(configPath))
         {
             output.WriteLine($"找不到配置文件：{configPath}");
             return 1;
@@ -56,8 +67,10 @@ public static class Program
 
         try
         {
-            return await ServeAsync(
-                RungConfig.Load(configPath), once, quiet, startupTimeout, output, cancellationToken)
+            var config = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+            output.WriteLine($"配置来源：{store.Description}");
+
+            return await ServeAsync(config, once, quiet, startupTimeout, output, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -293,6 +306,8 @@ public static class Program
 
             用法：
               rung <配置文件.json>          持续采集所有设备，断线自动重连，Ctrl+C 停止
+              rung --db <数据库.db>         同上，配置从 SQLite 读
+              rung config …                 导入/导出/查看配置，详见 rung config
               rung <配置文件.json> --once   采集一轮后退出
               rung <配置文件.json> --quiet  只打印警告以上级别的日志
               rung <配置文件.json> --timeout <秒>  首次连接的等待上限，缺省 30

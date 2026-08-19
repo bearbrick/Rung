@@ -10,6 +10,9 @@ internal static partial class HostLog
 
     [LoggerMessage(EventId = 5001, Level = LogLevel.Information, Message = "采集网关已停止")]
     public static partial void GatewayStopped(ILogger logger);
+
+    [LoggerMessage(EventId = 5002, Level = LogLevel.Information, Message = "配置来源：{Source}")]
+    public static partial void ConfigSource(ILogger logger, string source);
 }
 
 /// <summary>

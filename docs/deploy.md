@@ -47,6 +47,17 @@ docker run -d --name rung -p 5580:5580 \
 > 这份 Dockerfile **尚未在真实环境构建验证过**（开发机上没有 Docker）。
 > 第一次用请留意基础镜像标签和 npm 缓存层是否符合你们的内网源配置。
 
+## 重新生成数据库迁移
+
+改了配置实体之后：
+
+```bash
+export DOTNET_ROOT="$HOME/.dotnet"     # dotnet-ef 全局工具需要它才能找到运行时
+dotnet ef migrations add <名字> --project src/Rung.Configuration --output-dir Storage/Migrations
+```
+
+迁移在网关启动时自动应用，不需要手工执行。
+
 ## 端口与目录约定
 
 | 项 | 值 |

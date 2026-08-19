@@ -274,6 +274,37 @@ Modbus 报文实现，同源在这里不损失任何东西。）
 
 ---
 
+## 配置：JSON / SQLite / Excel
+
+小规模、想进版本控制就用 JSON；点位多、要在界面上改就用 SQLite。
+
+```bash
+rung config import 点位表.xlsx --db /var/lib/rung/rung.db   # 导入（也吃 .json）
+rung config export 点位表.xlsx --db /var/lib/rung/rung.db   # 导出核对
+rung config list --db /var/lib/rung/rung.db                 # 看有哪些设备
+
+rung --db /var/lib/rung/rung.db          # CLI 从 SQLite 跑
+rung-host --Db /var/lib/rung/rung.db     # 宿主同理
+```
+
+**Excel 是这一环最实用的部分**：现场交接时电气工程师给的就是一张表，
+能直接导入省掉的是几小时手工誊抄——而手工誊抄正是地址配错的主要来源。
+表头用中文（`设备ID` / `点位名` / `数据类型` / `倍率` / `死区` …），
+因为读写它的人是电气工程师不是程序员。
+
+解析逐行进行、**错误带行号**，且坏行跳过而不是整份拒绝：
+
+```
+! 点位 第 3 行：点位 B 的数据类型 "Fl0at32" 无法识别，可用：Bool / Int8 / ... / Float32 ...
+! 点位 第 7 行：点位 X 指向未定义的设备 "typo"，请先在「设备」表里加上
+  共 2 行有问题，已跳过；其余照常导入。
+```
+
+一张几百行的表里错两行，让人改完重来一遍不如先把对的导进去。
+
+数据库里枚举一律存字符串——有人拿 SQLite 浏览器打开时，看到 `Float32`
+比看到 `9` 有用得多。表结构用 EF Core Migrations 管理，启动时自动应用。
+
 ## 部署
 
 ```bash
@@ -307,7 +338,7 @@ cd web && npm run lint
 - [x] Redis / REST / SSE / Prometheus 输出
 - [x] Modbus TCP 驱动
 - [x] Web 界面、设备模拟器、单文件与容器交付
-- [ ] SQLite 配置存储 + Excel 导入导出（现在还是 JSON 文件）
+- [x] SQLite 配置存储 + Excel 导入导出
 - [ ] 点位配置的 Web 编辑
 - [ ] 真机验证与报文夹具替换
 - [ ] Modbus RTU（串口）、三菱 MC、欧姆龙 FINS

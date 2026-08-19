@@ -57,10 +57,16 @@ public sealed record RungConfig
             ?? throw new InvalidDataException($"配置文件 {path} 解析结果为空");
     }
 
-    /// <summary>把两种写法归一成设备列表。</summary>
+    /// <summary>
+    /// 把两种写法归一成设备列表。
+    /// <para>
+    /// <b>空列表是合法状态</b>，不是错误：刚建好还没导入任何设备的数据库就是这样。
+    /// 只有两种写法都缺席时才算配置有问题——那说明文件本身就不对。
+    /// </para>
+    /// </summary>
     public IReadOnlyList<DeviceConfig> ResolveDevices()
     {
-        if (Devices is { Count: > 0 })
+        if (Devices is not null)
         {
             return Devices;
         }
@@ -70,7 +76,9 @@ public sealed record RungConfig
             return [Device with { Tags = Device.Tags ?? Tags ?? [] }];
         }
 
-        throw new InvalidDataException("配置里既没有 devices 数组，也没有 device 单设备段");
+        throw new InvalidDataException(
+            "配置里既没有 devices 数组，也没有 device 单设备段。"
+            + "若用的是 SQLite，请先 rung config import 导入设备。");
     }
 
     /// <summary>为某台设备生成采集参数，设备级配置优先于全局。</summary>
