@@ -1,0 +1,516 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "rung-host | v1",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5580/"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "网关整体健康状况",
+        "description": "有设备掉线时 status 为 degraded。适合直接接监控探针。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "全部设备的运行状况",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{deviceId}": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "单台设备的运行状况",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "点位最新值",
+        "description": "可用 device 与 prefix 过滤。prefix 按业务名前缀匹配。",
+        "parameters": [
+          {
+            "name": "device",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/{tagName}": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "单个点位的最新值",
+        "parameters": [
+          {
+            "name": "tagName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tags/{tagName}/write": {
+      "post": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "写入点位",
+        "description": "值按点位声明的数据类型解释。写完会记审计日志，并回读设备上的真实值。 路径上显式写出 write 而不是用 PUT：这个动作会让产线上的机器真的动起来， 一眼看得出比符合 REST 惯例更重要。",
+        "parameters": [
+          {
+            "name": "tagName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteTagRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stream/tags": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "点位变化的实时推送（SSE）",
+        "description": "只推送越过死区的变化。浏览器用 EventSource 订阅，自带断线重连。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseItemOfTagView"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DeviceView": {
+        "required": [
+          "deviceId",
+          "state",
+          "lastSuccessUtc",
+          "lastFailureUtc",
+          "lastError",
+          "consecutiveFailures",
+          "reconnectCount",
+          "lastPollMs",
+          "negotiatedPduLength",
+          "activeTagCount",
+          "requestCount",
+          "overrunCount",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "设备标识。"
+          },
+          "state": {
+            "type": "string",
+            "description": "连接状态。"
+          },
+          "lastSuccessUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "最近一次成功采集时刻。",
+            "format": "date-time"
+          },
+          "lastFailureUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "最近一次失败时刻。",
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "最近一次错误描述。"
+          },
+          "consecutiveFailures": {
+            "type": "integer",
+            "description": "连续失败次数。",
+            "format": "int32"
+          },
+          "reconnectCount": {
+            "type": "integer",
+            "description": "累计重连次数。",
+            "format": "int32"
+          },
+          "lastPollMs": {
+            "type": "number",
+            "description": "上一轮采集耗时，毫秒。",
+            "format": "double"
+          },
+          "negotiatedPduLength": {
+            "type": "integer",
+            "description": "协商的 PDU 长度。",
+            "format": "int32"
+          },
+          "activeTagCount": {
+            "type": "integer",
+            "description": "参与采集的点位数。",
+            "format": "int32"
+          },
+          "requestCount": {
+            "type": "integer",
+            "description": "每轮请求次数。",
+            "format": "int32"
+          },
+          "overrunCount": {
+            "type": "integer",
+            "description": "采集超时次数。",
+            "format": "int32"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagIssueView"
+            },
+            "description": "配置有问题的点位。"
+          }
+        },
+        "description": "一台设备的对外状况。"
+      },
+      "HealthView": {
+        "required": [
+          "status",
+          "deviceCount",
+          "connectedCount",
+          "tagCount",
+          "issueCount",
+          "uptimeSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "healthy / degraded。有设备掉线即为 degraded。"
+          },
+          "deviceCount": {
+            "type": "integer",
+            "description": "设备总数。",
+            "format": "int32"
+          },
+          "connectedCount": {
+            "type": "integer",
+            "description": "已连接的设备数。",
+            "format": "int32"
+          },
+          "tagCount": {
+            "type": "integer",
+            "description": "缓存中的点位数。",
+            "format": "int32"
+          },
+          "issueCount": {
+            "type": "integer",
+            "description": "配置有问题的点位总数。",
+            "format": "int32"
+          },
+          "uptimeSeconds": {
+            "type": "number",
+            "description": "运行时长，秒。",
+            "format": "double"
+          }
+        },
+        "description": "网关整体健康状况。"
+      },
+      "JsonElement": { },
+      "SseItemOfTagView": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TagView"
+          },
+          "eventType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reconnectionInterval": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TagIssueView": {
+        "required": [
+          "tagName",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "tagName": {
+            "type": "string",
+            "description": "点位名。"
+          },
+          "reason": {
+            "type": "string",
+            "description": "原因，应当足以让电气工程师自己改对。"
+          }
+        },
+        "description": "一个点位的配置问题。"
+      },
+      "TagView": {
+        "required": [
+          "name",
+          "value",
+          "quality",
+          "timestampUtc",
+          "deviceId",
+          "address",
+          "dataType",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "业务点位名。"
+          },
+          "value": {
+            "description": "当前值。质量不佳时为 null。"
+          },
+          "quality": {
+            "type": "string",
+            "description": "采集质量。"
+          },
+          "timestampUtc": {
+            "type": "string",
+            "description": "采集时刻，UTC。",
+            "format": "date-time"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "来源设备。"
+          },
+          "address": {
+            "type": "string",
+            "description": "协议地址，便于现场核对。"
+          },
+          "dataType": {
+            "type": "string",
+            "description": "数据类型。"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "描述。"
+          }
+        },
+        "description": "    一个点位的对外表示。\n    刻意不暴露 TagValue 本身：它是为热路径设计的紧凑结构体，\n换成 JSON 友好的形状之后，接口契约才能独立于内部实现演进。"
+      },
+      "WriteTagRequest": {
+        "required": [
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "description": "要写入的工程值。网关按点位的数据类型自行转换。",
+            "$ref": "#/components/schemas/JsonElement"
+          }
+        },
+        "description": "写点位的请求体。"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Rung"
+    }
+  ]
+}

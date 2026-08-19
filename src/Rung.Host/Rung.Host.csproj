@@ -18,4 +18,37 @@
     <ProjectReference Include="..\Rung.Sinks.Redis\Rung.Sinks.Redis.csproj" />
   </ItemGroup>
 
+  <!--
+    发布时顺带构建前端。
+    带 SkipWebUi=true 的逃生口：没装 Node 的机器（比如只跑后端测试的 CI 作业）
+    可以跳过，不至于因为缺 npm 就整个发布不了。
+  -->
+  <PropertyGroup>
+    <WebUiDirectory>$(MSBuildProjectDirectory)/../../web</WebUiDirectory>
+  </PropertyGroup>
+
+  <Target Name="BuildWebUi"
+          BeforeTargets="ComputeResolvedFilesToPublishList"
+          Condition="'$(SkipWebUi)' != 'true' AND Exists('$(WebUiDirectory)/package.json')">
+    <Message Importance="high" Text="构建 Web UI（跳过请加 -p:SkipWebUi=true）…" />
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(WebUiDirectory)" />
+    <Exec Command="npm run build" WorkingDirectory="$(WebUiDirectory)" />
+  </Target>
+
+  <!--
+    wwwroot 的内容是构建期生成的，而 SDK 的内容枚举发生在求值期，
+    因此必须显式登记，否则发布产物里不会有前端文件。
+  -->
+  <Target Name="PublishWebUi"
+          AfterTargets="BuildWebUi"
+          BeforeTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_WebUiOutput Include="$(MSBuildProjectDirectory)/wwwroot/**/*" Exclude="**/.gitkeep" />
+      <ResolvedFileToPublish Include="@(_WebUiOutput)">
+        <RelativePath>wwwroot/%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>

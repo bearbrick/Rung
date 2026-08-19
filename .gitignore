@@ -55,3 +55,8 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# 前端构建产物。dotnet publish 会自动构建；本地开发跑 web/ 下的 npm run build
+src/Rung.Host/wwwroot/*
+!src/Rung.Host/wwwroot/.gitkeep
+web/node_modules/

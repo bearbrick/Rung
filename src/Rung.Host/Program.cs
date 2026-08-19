@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // 部署时端口撞车是最烦人的小事，写死在这里省掉一轮沟通
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://0.0.0.0:5580");
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddSchemaTransformer<NumericSchemaTransformer>());
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton(GatewayStartupTime.Now());
 

@@ -5,9 +5,9 @@
 把西门子 S7、三菱 MC、欧姆龙 FINS、Modbus 设备的点位可视化配置好，
 采集到的数据通过 REST、MQTT 或 Redis 供上层系统使用。单文件部署，无外部依赖。
 
-> **状态：v0.1 MVP。** 已经是一个能挂在服务器上长期运行的采集服务：
-> 多台设备并行采集、断线自己按退避重连、数据写进 Redis，并提供 REST + SSE 接口。
-> Web UI 与 SQLite 配置还在路上。
+> **状态：v0.1 MVP。** 多台设备并行采集、断线自己按退避重连、数据写进 Redis，
+> REST + SSE 接口，以及一个能看实时值、查设备状况、手动读写的 Web 界面。
+> SQLite 配置存储与 Excel 导入导出还在路上。
 
 ## 跑起来（不需要 PLC）
 
@@ -21,8 +21,11 @@ dotnet run --project src/Rung.Simulator -- samples/simulator.json
 dotnet run --project src/Rung.Host -- --ConfigPath $PWD/samples/gateway.json
 ```
 
-然后 <http://localhost:5580/api/health>。想在终端里看数据流的话，
-`src/Rung.Cli` 是同一套内核的命令行形态。
+然后打开 <http://localhost:5580> —— 点位实时值、设备状况、手动写点位都在里面。
+想在终端里看数据流的话，`src/Rung.Cli` 是同一套内核的命令行形态。
+
+> 从源码首次运行需要先构建前端：`cd web && npm install && npm run build`。
+> `dotnet publish` 会自动做这一步（没装 Node 的机器加 `-p:SkipWebUi=true` 跳过）。
 
 ```
 [line1-oven]  PDU 240 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 0.1 ms
@@ -41,6 +44,22 @@ dotnet run --project src/Rung.Host -- --ConfigPath $PWD/samples/gateway.json
 ```
 
 `--once` 采一轮就退出，适合脚本和现场点位验证；`--timeout <秒>` 控制首次连接的等待上限。
+
+## Web 界面
+
+React + TypeScript + Vite + Ant Design，构建产物输出到 `Rung.Host/wwwroot`，
+和后端一起打进单个发布目录，部署时不多一个组件。
+
+- **点位实时值**：SSE 增量更新而非轮询，值变化时闪一下绿底。
+  上千个点位靠虚拟滚动，可按点位名/地址过滤、按设备筛选、只看异常
+- **设备状况**：连接状态、上轮耗时、`点位/请求` 比（合并效果一眼可见）、
+  重连与超时次数。有配置问题或故障的设备可展开看详情
+- **手动读写**：现场调试时省一半时间，不用开博途也不用写临时脚本。
+  写完显示的是**设备回读值**，与填入值不同就说明 PLC 做了钳位或被联锁改回去了
+
+TypeScript 类型由 OpenAPI 文档生成（`npm run gen:api`）。后端改了 DTO
+而前端没重新生成，`npm run lint` 会当场报错——前后端契约漂移是这类项目
+最常见的低级 bug 来源，配一次就永久消失。
 
 ## HTTP 接口
 
@@ -169,9 +188,9 @@ dotnet test
 - [x] Redis 北向输出：最新值 Hash、变化 Pub/Sub、设备状况
 - [x] REST + SSE 接口，带 OpenAPI 文档
 - [ ] MQTT 输出
-- [ ] SQLite 配置存储 + Excel 导入导出
+- [ ] SQLite 配置存储 + Excel 导入导出（现在还是 JSON 文件）
 - [ ] `Rung.Drivers.Modbus`：基于 FluentModbus
-- [ ] Web UI：设备列表、点位实时值、手动读写测试
+- [x] Web UI：点位实时值、设备状况、手动读写
 - [ ] 打包：Docker 多架构镜像 + Linux 单文件自包含发布
 
 ## 许可
