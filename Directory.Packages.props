@@ -31,6 +31,10 @@
 
   <ItemGroup Label="Sinks">
     <PackageVersion Include="StackExchange.Redis" Version="3.1.13" />
+    <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
+    <!-- MQTTnet 5 起服务端拆成独立包。只有测试用得到：
+         开发机上不必装 broker 就能端到端验证 -->
+    <PackageVersion Include="MQTTnet.Server" Version="5.2.0.1603" />
   </ItemGroup>
 
   <ItemGroup Label="Drivers">

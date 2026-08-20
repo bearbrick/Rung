@@ -123,6 +123,7 @@ src/
   Rung.Drivers.Modbus/     Modbus TCP 驱动：地址语义、批量合并、多从站
   Rung.Core/               采集内核：退避重连、分组调度、点位缓存、写队列、多设备编排
   Rung.Sinks.Redis/        Redis 北向输出
+  Rung.Sinks.Mqtt/         MQTT 北向输出（保留消息 + 遗嘱消息）
   Rung.Configuration/      配置模型，CLI 与 Host 共用
   Rung.Host/               ASP.NET Core 宿主：REST + SSE + OpenAPI + Prometheus
   Rung.Cli/                命令行形态，终端里看数据流
@@ -219,6 +220,18 @@ S7-1200/1500 通常是 rack 0 / slot 1。
 变化推送到 `rung:changes`，设备状况写 `rung:device:{id}`。
 值刻意存成人能直接读懂的文本——现场排障最常用的动作就是
 `redis-cli HGETALL rung:tag:Line1.Oven.Temp`，一眼看不懂这个设计就失败了。
+
+**MQTT** 输出把点位发到 `rung/tag/{业务名}`，设备状况发到 `rung/device/{id}`。
+两个 MQTT 特有的设计点：
+
+- **点位默认以保留消息发布**。这是 MQTT 侧对应 Redis 缓存的机制：
+  新订阅者一连上就拿到每个点位的最后已知值，不必干等下一次变化——
+  对几分钟才动一次的温度量，那个等待不可接受。
+- **网关在线状态用遗嘱消息保证**。进程被杀、机器断电、网线被拔时，
+  broker 会替网关往 `rung/status` 发 `offline`。没有这条，订阅方无法区分
+  「值一直没变」和「网关早就死了」，而这两件事在产线上的处置方式完全相反。
+
+Redis 是「拉」、MQTT 是「推」，互不影响，可以同时开。
 
 **Prometheus** 指标里最值得配告警的是 `rung_device_overruns_total`：
 持续增长说明采集周期设得太快，或者点位太多需要拆组。
@@ -361,7 +374,7 @@ cd web && npm run lint
 - [ ] 点位配置的 Web 编辑
 - [ ] 真机验证与报文夹具替换
 - [ ] Modbus RTU（串口）、三菱 MC、欧姆龙 FINS
-- [ ] MQTT 输出
+- [x] MQTT 输出
 
 ---
 

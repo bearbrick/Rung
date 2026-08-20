@@ -9,6 +9,7 @@
     <Project Path="src/Rung.Host/Rung.Host.csproj" />
     <Project Path="src/Rung.Protocols.S7/Rung.Protocols.S7.csproj" />
     <Project Path="src/Rung.Simulator/Rung.Simulator.csproj" />
+    <Project Path="src/Rung.Sinks.Mqtt/Rung.Sinks.Mqtt.csproj" />
     <Project Path="src/Rung.Sinks.Redis/Rung.Sinks.Redis.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -19,6 +20,7 @@
     <Project Path="tests/Rung.Host.Tests/Rung.Host.Tests.csproj" />
     <Project Path="tests/Rung.Protocols.S7.Tests/Rung.Protocols.S7.Tests.csproj" />
     <Project Path="tests/Rung.Simulator.Tests/Rung.Simulator.Tests.csproj" />
+    <Project Path="tests/Rung.Sinks.Mqtt.Tests/Rung.Sinks.Mqtt.Tests.csproj" />
     <Project Path="tests/Rung.Sinks.Redis.Tests/Rung.Sinks.Redis.Tests.csproj" />
   </Folder>
 </Solution>

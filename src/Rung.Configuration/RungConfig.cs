@@ -38,8 +38,11 @@ public sealed record RungConfig
     /// <summary>断线重连参数。</summary>
     public ReconnectConfig? Reconnect { get; init; }
 
-    /// <summary>Redis 北向输出。不配则只往控制台打印。</summary>
+    /// <summary>Redis 北向输出。不配则不启用。</summary>
     public RedisConfig? Redis { get; init; }
+
+    /// <summary>MQTT 北向输出。与 Redis 互不影响，可以同时开。</summary>
+    public MqttConfig? Mqtt { get; init; }
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -136,6 +139,46 @@ public sealed record RedisConfig
     public string? ChannelName { get; init; }
 
     /// <summary>设备状态的上报周期，秒。0 表示不上报。</summary>
+    public int StatusIntervalSeconds { get; init; } = 10;
+}
+
+/// <summary>
+/// MQTT 北向输出配置。
+/// <para>
+/// 与 Redis 的分工：Redis 是「拉」，应用要值的时候去读；MQTT 是「推」，
+/// 适合订阅方分散、或者跨网段只能单向出流量的场景。
+/// </para>
+/// </summary>
+public sealed record MqttConfig
+{
+    /// <summary>是否启用。</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>Broker 主机。</summary>
+    public string Host { get; init; } = "127.0.0.1";
+
+    /// <summary>Broker 端口。</summary>
+    public int Port { get; init; } = 1883;
+
+    /// <summary>客户端标识，留空则用 <c>rung-{机器名}</c>。</summary>
+    public string? ClientId { get; init; }
+
+    /// <summary>用户名。</summary>
+    public string? Username { get; init; }
+
+    /// <summary>密码。</summary>
+    public string? Password { get; init; }
+
+    /// <summary>主题前缀。</summary>
+    public string TopicPrefix { get; init; } = "rung";
+
+    /// <summary>点位消息的 QoS，默认 0。</summary>
+    public int TagQos { get; init; }
+
+    /// <summary>点位是否以保留消息发布，默认开启。</summary>
+    public bool RetainTags { get; init; } = true;
+
+    /// <summary>设备状态上报周期，秒。0 表示不上报。</summary>
     public int StatusIntervalSeconds { get; init; } = 10;
 }
 

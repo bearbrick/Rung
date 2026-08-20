@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />
     <ProjectReference Include="..\Rung.Drivers.Modbus\Rung.Drivers.Modbus.csproj" />
     <ProjectReference Include="..\Rung.Drivers.S7\Rung.Drivers.S7.csproj" />
+    <ProjectReference Include="..\Rung.Sinks.Mqtt\Rung.Sinks.Mqtt.csproj" />
     <ProjectReference Include="..\Rung.Sinks.Redis\Rung.Sinks.Redis.csproj" />
   </ItemGroup>
 

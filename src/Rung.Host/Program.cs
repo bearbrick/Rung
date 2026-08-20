@@ -6,6 +6,7 @@ using Rung.Drivers.Modbus;
 using Rung.Drivers.S7;
 using Rung.Host;
 using Rung.Host.Endpoints;
+using Rung.Sinks.Mqtt;
 using Rung.Sinks.Redis;
 
 // 容器健康检查探针。aspnet 基础镜像里没有 curl/wget，
@@ -87,6 +88,11 @@ builder.Services.AddSingleton(provider =>
         sinks.Add(redis);
     }
 
+    if (provider.GetService<MqttTagSink>() is { } mqtt)
+    {
+        sinks.Add(mqtt);
+    }
+
     var gateway = new GatewayHost(
         provider.GetServices<IDeviceDriverFactory>(),
         cache,
@@ -100,6 +106,24 @@ builder.Services.AddSingleton(provider =>
 
     return gateway;
 });
+
+// MQTT 与 Redis 互不影响，可以同时开
+if (rungConfig.Mqtt is { Enabled: true } mqttConfig)
+{
+    builder.Services.AddSingleton(provider => MqttTagSink.ConnectAsync(
+        new MqttSinkOptions
+        {
+            Host = mqttConfig.Host,
+            Port = mqttConfig.Port,
+            ClientId = mqttConfig.ClientId,
+            Username = mqttConfig.Username,
+            Password = mqttConfig.Password,
+            TopicPrefix = mqttConfig.TopicPrefix,
+            TagQos = mqttConfig.TagQos,
+            RetainTags = mqttConfig.RetainTags,
+        },
+        provider.GetRequiredService<ILogger<MqttTagSink>>()).GetAwaiter().GetResult());
+}
 
 builder.Services.AddHostedService<GatewayService>();
 

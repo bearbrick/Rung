@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Rung.Sinks.Mqtt</PackageId>
+    <Description>Rung 的 MQTT 北向输出：点位值以保留消息发布，网关在线状态用遗嘱消息保证。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="MQTTnet" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />
+  </ItemGroup>
+</Project>
