@@ -74,6 +74,7 @@ builder.Services.AddSingleton<IDeviceDriverFactory, S7DriverFactory>();
 builder.Services.AddSingleton<IDeviceDriverFactory, ModbusDriverFactory>();
 builder.Services.AddSingleton<IDeviceDriverFactory, MelsecDriverFactory>();
 builder.Services.AddSingleton<IDeviceDriverFactory, FinsDriverFactory>();
+builder.Services.AddSingleton<IDeviceDriverFactory, ModbusRtuDriverFactory>();
 
 // Redis 输出是可选的：没配就整个不注册，下游用 GetService 取到 null 即可。
 // 连不上也不影响采集——abortConnect=false 让它自己在后台重连

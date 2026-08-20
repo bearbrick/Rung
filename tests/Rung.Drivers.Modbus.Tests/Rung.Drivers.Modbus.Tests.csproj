@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Rung.Drivers.Modbus\Rung.Drivers.Modbus.csproj" />
+    <ProjectReference Include="..\..\src\Rung.Simulator\Rung.Simulator.csproj" />
   </ItemGroup>
 </Project>

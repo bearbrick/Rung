@@ -131,7 +131,7 @@ public static class Program
         await using var redisScope = redis;
         await using var host = new GatewayHost(
             [new S7DriverFactory(), new ModbusDriverFactory(),
-             new MelsecDriverFactory(), new FinsDriverFactory()],
+             new MelsecDriverFactory(), new FinsDriverFactory(), new ModbusRtuDriverFactory()],
             cache, sinks, loggerFactory);
 
         foreach (var device in devices)

@@ -167,7 +167,7 @@ internal static class ConfigCommands
 
         IDeviceDriverFactory[] factories =
             [new S7DriverFactory(), new ModbusDriverFactory(),
-             new MelsecDriverFactory(), new FinsDriverFactory()];
+             new MelsecDriverFactory(), new FinsDriverFactory(), new ModbusRtuDriverFactory()];
         var registrations = config.ResolveDevices()
             .Select(device => new DeviceRegistration(
                 device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device)))

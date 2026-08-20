@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Ports;
 using System.Net;
 using System.Net.Sockets;
 using FluentModbus;
@@ -6,9 +7,34 @@ using Rung.Abstractions;
 
 namespace Rung.Drivers.Modbus;
 
-/// <summary>Modbus TCP 驱动的连接参数。</summary>
+/// <summary>Modbus 的传输方式。</summary>
+public enum ModbusTransport
+{
+    /// <summary>Modbus TCP，走以太网。</summary>
+    Tcp = 0,
+
+    /// <summary>Modbus RTU，走串口 RS-485/RS-232。</summary>
+    Rtu = 1,
+}
+
+/// <summary>Modbus 驱动的连接参数。</summary>
 public sealed record ModbusDriverOptions
 {
+    /// <summary>传输方式。</summary>
+    public ModbusTransport Transport { get; init; }
+
+    /// <summary>串口波特率。</summary>
+    public int BaudRate { get; init; } = 9600;
+
+    /// <summary>串口校验位：None / Odd / Even。</summary>
+    public Parity Parity { get; init; } = Parity.None;
+
+    /// <summary>串口数据位。</summary>
+    public int DataBits { get; init; } = 8;
+
+    /// <summary>串口停止位。</summary>
+    public StopBits StopBits { get; init; } = StopBits.One;
+
     /// <summary>默认从站号。点位地址可用 <c>3:HR100</c> 覆盖。</summary>
     public byte DefaultUnitId { get; init; } = 1;
 
@@ -24,6 +50,17 @@ public sealed record ModbusDriverOptions
         {
             DefaultUnitId = (byte)options.GetInt32("unitId", 1),
             MaxGapRegisters = options.GetInt32("maxGapRegisters", 16),
+            Transport = string.Equals(options.GetString("transport"), "rtu", StringComparison.OrdinalIgnoreCase)
+                ? ModbusTransport.Rtu
+                : ModbusTransport.Tcp,
+            BaudRate = options.GetInt32("baudRate", 9600),
+            Parity = Enum.TryParse<Parity>(options.GetString("parity"), ignoreCase: true, out var parity)
+                ? parity
+                : Parity.None,
+            DataBits = options.GetInt32("dataBits", 8),
+            StopBits = Enum.TryParse<StopBits>(options.GetString("stopBits"), ignoreCase: true, out var stop)
+                ? stop
+                : StopBits.One,
         };
     }
 }
@@ -44,16 +81,33 @@ public sealed class ModbusDriver : IDeviceDriver
     private readonly DeviceOptions _deviceOptions;
     private readonly ModbusDriverOptions _modbusOptions;
 
-    private ModbusTcpClient? _client;
+    private readonly Func<IModbusRtuSerialPort>? _serialPortFactory;
+
+    private ModbusClient? _client;
     private bool _disposed;
 
-    /// <summary>创建一个驱动实例。此时不发起任何网络 IO。</summary>
+    /// <summary>创建一个驱动实例。此时不发起任何 IO。</summary>
     public ModbusDriver(DeviceOptions options)
+        : this(options, serialPortFactory: null)
+    {
+    }
+
+    /// <summary>
+    /// 用自定义串口实现创建驱动，仅对 RTU 有意义。
+    /// <para>
+    /// 存在这个入口有两个理由：一是测试——串口设备不可能进 CI，
+    /// 有了它就能用一对内存串口把真实的 RTU 帧（含 CRC）完整验一遍；
+    /// 二是现场偶尔要走串口服务器或带特殊时序的 RS-485 转换器，
+    /// 那时可以自己实现这一层而不必改驱动。
+    /// </para>
+    /// </summary>
+    public ModbusDriver(DeviceOptions options, Func<IModbusRtuSerialPort>? serialPortFactory)
     {
         ArgumentNullException.ThrowIfNull(options);
 
         _deviceOptions = options;
         _modbusOptions = ModbusDriverOptions.FromDeviceOptions(options);
+        _serialPortFactory = serialPortFactory;
         DeviceId = options.DeviceId;
     }
 
@@ -79,21 +133,10 @@ public sealed class ModbusDriver : IDeviceDriver
 
         try
         {
-            var port = _deviceOptions.Port > 0 ? _deviceOptions.Port : 502;
-            var client = new ModbusTcpClient
-            {
-                ConnectTimeout = _deviceOptions.TimeoutMs,
-                ReadTimeout = _deviceOptions.TimeoutMs,
-                WriteTimeout = _deviceOptions.TimeoutMs,
-            };
+            _client = _modbusOptions.Transport == ModbusTransport.Rtu
+                ? ConnectRtu()
+                : (ModbusClient)ConnectTcp();
 
-            var endpoint = new IPEndPoint(ResolveAddress(_deviceOptions.Host), port);
-
-            // FluentModbus 只提供同步 Connect。它带超时，且连接是低频动作，
-            // 阻塞采集工作者自己的那条循环可以接受
-            client.Connect(endpoint, ModbusEndianness.BigEndian);
-
-            _client = client;
             State = DriverState.Connected;
         }
         catch
@@ -116,6 +159,48 @@ public sealed class ModbusDriver : IDeviceDriver
         State = DriverState.Disconnected;
 
         return ValueTask.CompletedTask;
+    }
+
+    private ModbusTcpClient ConnectTcp()
+    {
+        var port = _deviceOptions.Port > 0 ? _deviceOptions.Port : 502;
+        var client = new ModbusTcpClient
+        {
+            ConnectTimeout = _deviceOptions.TimeoutMs,
+            ReadTimeout = _deviceOptions.TimeoutMs,
+            WriteTimeout = _deviceOptions.TimeoutMs,
+        };
+
+        var endpoint = new IPEndPoint(ResolveAddress(_deviceOptions.Host), port);
+
+        // FluentModbus 只提供同步 Connect。它带超时，且连接是低频动作，
+        // 阻塞采集工作者自己的那条循环可以接受
+        client.Connect(endpoint, ModbusEndianness.BigEndian);
+
+        return client;
+    }
+
+    private ModbusRtuClient ConnectRtu()
+    {
+        var client = new ModbusRtuClient
+        {
+            BaudRate = _modbusOptions.BaudRate,
+            Parity = _modbusOptions.Parity,
+            StopBits = _modbusOptions.StopBits,
+            ReadTimeout = _deviceOptions.TimeoutMs,
+            WriteTimeout = _deviceOptions.TimeoutMs,
+        };
+
+        if (_serialPortFactory is { } factory)
+        {
+            client.Initialize(factory(), ModbusEndianness.BigEndian);
+            return client;
+        }
+
+        // RTU 下 Host 字段放的是串口名：Linux 上形如 /dev/ttyUSB0，Windows 上形如 COM3
+        client.Connect(_deviceOptions.Host, ModbusEndianness.BigEndian);
+
+        return client;
     }
 
     /// <inheritdoc/>
@@ -369,7 +454,8 @@ public sealed class ModbusDriver : IDeviceDriver
 
         try
         {
-            _client.Disconnect();
+            (_client as ModbusTcpClient)?.Disconnect();
+            (_client as ModbusRtuClient)?.Close();
         }
         catch (Exception ex) when (ex is SocketException or IOException or ObjectDisposedException)
         {
@@ -420,4 +506,43 @@ public sealed class ModbusDriverFactory : IDeviceDriverFactory
             MaxGapRegisters = modbusOptions.MaxGapRegisters,
         });
     }
+}
+
+/// <summary>
+/// Modbus RTU（串口）驱动工厂。
+/// <para>
+/// <b>一条 RS-485 总线要配成一台 Rung 设备，不是多台。</b>
+/// 总线上的多个从站用地址前缀区分（<c>3:HR100</c>），因为串口是独占资源——
+/// 配成多台设备会让多个采集工作者去抢同一个串口，谁也打不开。
+/// 这一点和 TCP 完全相反，是从 TCP 迁过来时最容易配错的地方。
+/// </para>
+/// </summary>
+public sealed class ModbusRtuDriverFactory : IDeviceDriverFactory
+{
+    /// <inheritdoc/>
+    public string Protocol => "modbus-rtu";
+
+    /// <inheritdoc/>
+    public string AddressSyntaxHint =>
+        "地址写法与 Modbus TCP 相同（HR100 / 40001 / HR100.3 / 3:HR100）。"
+        + " 设备的 host 字段填串口名：Linux 上形如 /dev/ttyUSB0，Windows 上形如 COM3。"
+        + " 一条总线配成一台设备，多从站用 3:HR100 这样的前缀区分";
+
+    /// <inheritdoc/>
+    public IDeviceDriver Create(DeviceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        // 无论配置里怎么写，这个工厂产出的一定是 RTU
+        var extra = new Dictionary<string, string>(options.Extra, StringComparer.OrdinalIgnoreCase)
+        {
+            ["transport"] = "rtu",
+        };
+
+        return new ModbusDriver(options with { Extra = extra });
+    }
+
+    /// <inheritdoc/>
+    public IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags)
+        => new ModbusDriverFactory().CompileOffline(options, tags);
 }
