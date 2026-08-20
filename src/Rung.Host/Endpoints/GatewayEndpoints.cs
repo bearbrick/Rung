@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using Rung.Abstractions;
+using Rung.Configuration;
+using Rung.Configuration.Storage;
 using Rung.Core;
 
 namespace Rung.Host.Endpoints;
@@ -42,6 +44,12 @@ public static class GatewayEndpoints
             .WithSummary("点位变化的实时推送（SSE）")
             .WithDescription("只推送越过死区的变化。浏览器用 EventSource 订阅，自带断线重连。");
 
+        api.MapPost("/config/reload", ReloadConfig)
+            .WithSummary("从配置源重新加载")
+            .WithDescription(
+                "只有配置真的变了的设备会被重启，其余原地继续跑，采集不中断。"
+                + " 校验失败时配置原封不动，不会留下一个改了一半的网关。");
+
         // /metrics 按惯例挂在根上而不是 /api 下，抓取端默认就找这个路径
         app.MapGet("/metrics", GetMetrics)
             .WithTags("Rung")
@@ -49,6 +57,37 @@ public static class GatewayEndpoints
             .ExcludeFromDescription();
 
         return app;
+    }
+
+    /// <summary>把配置模型映射成设备注册项。</summary>
+    public static IReadOnlyList<DeviceRegistration> ToRegistrations(RungConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        return [.. config.ResolveDevices().Select(device => new DeviceRegistration(
+            device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device)))];
+    }
+
+    private static async Task<Results<Ok<ReloadView>, BadRequest<string>>> ReloadConfig(
+        GatewayHost gateway,
+        IConfigStore store,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var config = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+            var result = await gateway
+                .ReloadAsync(ToRegistrations(config), cancellationToken)
+                .ConfigureAwait(false);
+
+            return TypedResults.Ok(new ReloadView(
+                store.Description, result.Added, result.Restarted, result.Removed, result.Unchanged));
+        }
+        catch (Exception ex) when (ex is RungException or IOException or InvalidDataException)
+        {
+            // 校验失败时网关状态没有任何改动，如实把原因回给调用方
+            return TypedResults.BadRequest(ex.Message);
+        }
     }
 
     private static ContentHttpResult GetMetrics(GatewayHost gateway)

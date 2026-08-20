@@ -34,7 +34,7 @@ if (!string.IsNullOrWhiteSpace(databasePath))
     var sqliteStore = new SqliteConfigStore(databasePath);
     var sqliteConfig = await sqliteStore.LoadAsync(CancellationToken.None);
 
-    return await RunGatewayAsync(builder, sqliteConfig, sqliteStore.Description);
+    return await RunGatewayAsync(builder, sqliteConfig, sqliteStore);
 }
 
 // 相对路径按内容根解析，而不是按当前工作目录——dotnet run 时这两者经常不是一回事。
@@ -52,11 +52,13 @@ if (!File.Exists(resolvedConfigPath))
     return 1;
 }
 
-return await RunGatewayAsync(builder, RungConfig.Load(resolvedConfigPath), $"JSON 文件 {resolvedConfigPath}");
+return await RunGatewayAsync(
+    builder, RungConfig.Load(resolvedConfigPath), new JsonConfigStore(resolvedConfigPath));
 
-async Task<int> RunGatewayAsync(WebApplicationBuilder builder, RungConfig rungConfig, string source)
+async Task<int> RunGatewayAsync(WebApplicationBuilder builder, RungConfig rungConfig, IConfigStore store)
 {
 builder.Services.AddSingleton(rungConfig);
+builder.Services.AddSingleton(store);
 builder.Services.AddSingleton<TagCache>();
 builder.Services.AddSingleton<TagChangeBroadcaster>();
 builder.Services.AddSingleton<IDeviceDriverFactory, S7DriverFactory>();
@@ -99,9 +101,9 @@ builder.Services.AddSingleton(provider =>
         sinks,
         provider.GetRequiredService<ILoggerFactory>());
 
-    foreach (var device in rungConfig.ResolveDevices())
+    foreach (var registration in GatewayEndpoints.ToRegistrations(rungConfig))
     {
-        gateway.AddDevice(device.ToDeviceOptions(), device.ToTagDefs(), rungConfig.ToWorkerOptions(device));
+        gateway.AddDevice(registration.Options, registration.Tags, registration.WorkerOptions);
     }
 
     return gateway;
@@ -136,7 +138,7 @@ app.MapGatewayEndpoints();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-HostLog.ConfigSource(app.Logger, source);
+HostLog.ConfigSource(app.Logger, store.Description);
 
 await app.RunAsync();
 return 0;

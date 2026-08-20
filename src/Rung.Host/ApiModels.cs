@@ -116,6 +116,19 @@ public sealed record HealthView(
     int IssueCount,
     double UptimeSeconds);
 
+/// <summary>一次配置重载的结果。</summary>
+/// <param name="Source">配置来源描述。</param>
+/// <param name="Added">新启动的设备。</param>
+/// <param name="Restarted">配置变了、被重启的设备。</param>
+/// <param name="Removed">被移除的设备。</param>
+/// <param name="Unchanged">配置未变、原地继续跑的设备。</param>
+public sealed record ReloadView(
+    string Source,
+    IReadOnlyList<string> Added,
+    IReadOnlyList<string> Restarted,
+    IReadOnlyList<string> Removed,
+    IReadOnlyList<string> Unchanged);
+
 /// <summary>写点位的请求体。</summary>
 /// <param name="Value">要写入的工程值。网关按点位的数据类型自行转换。</param>
 public sealed record WriteTagRequest(System.Text.Json.JsonElement Value);

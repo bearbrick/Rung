@@ -62,6 +62,11 @@ internal static partial class Log
         Message = "设备 {DeviceId} 的工作循环意外退出，该设备将停止采集")]
     public static partial void DeviceLoopCrashed(ILogger logger, Exception exception, string deviceId);
 
+    [LoggerMessage(EventId = 1006, Level = LogLevel.Information,
+        Message = "配置已在线重载：新增 {Added}，重启 {Restarted}，移除 {Removed}，未变 {Unchanged}")]
+    public static partial void ConfigReloaded(
+        ILogger logger, int added, int restarted, int removed, int unchanged);
+
     [LoggerMessage(EventId = 3000, Level = LogLevel.Error,
         Message = "北向输出 {SinkName} 推送失败，采集不受影响")]
     public static partial void SinkFailed(ILogger logger, Exception exception, string sinkName);

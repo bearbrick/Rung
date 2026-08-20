@@ -103,6 +103,27 @@ public sealed class TagCache
         }
     }
 
+    /// <summary>
+    /// 移除某台设备的全部点位。热重载时设备被删掉后要连着缓存一起清，
+    /// 否则界面上会一直挂着一台已经不存在的设备的陈旧值。
+    /// </summary>
+    public int RemoveDevice(string deviceId)
+    {
+        var removed = 0;
+
+        foreach (var (name, snapshot) in _current)
+        {
+            if (string.Equals(snapshot.DeviceId, deviceId, StringComparison.Ordinal)
+                && _current.TryRemove(name, out _))
+            {
+                _lastPublished.TryRemove(name, out _);
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
     private bool ShouldPublish(TagDef tag, TagValue value)
     {
         if (!_lastPublished.TryGetValue(tag.Name, out var previous))

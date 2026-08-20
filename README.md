@@ -154,6 +154,12 @@ Web 界面上的 `点位/请求` 一栏就是这个效果的直接体现。
 同时断线，没有抖动它们会整整齐齐在同一毫秒重连。断线期间缓存降级为 `Stale`
 但保留最后已知值——应用侧读到"5 分钟前的 235 度"，比读到 null 有用得多。
 
+**配置在线重载，不重启进程。** 改了点位表调一次 `/api/config/reload` 即可，
+只有配置真的变了的设备会被重启，其余原地继续跑。加一个点位就把全线设备
+断一遍重连，代价比它要解决的问题还大。变更检测靠一份手工计算的配置指纹——
+`DeviceOptions.Extra` 是字典、点位是列表，靠 record 的结构相等会判定成"每次都变了"。
+校验失败时配置原封不动，不会留下一个改了一半的网关。
+
 **采集按截止时间驱动，不排队。** 设备变慢时截止时间顺延并计入 `OverrunCount`，
 不会积压出越滚越大的任务队列——那种积压最后表现为"网关内存一直涨"。
 
@@ -209,6 +215,7 @@ S7-1200/1500 通常是 rack 0 / slot 1。
 | GET | `/api/tags` | 点位最新值，支持 `?device=` 与 `?prefix=` |
 | GET | `/api/tags/{name}` | 单个点位 |
 | POST | `/api/tags/{name}/write` | 写点位，**返回回读到的设备实际值** |
+| POST | `/api/config/reload` | 在线重载配置，不重启进程 |
 | GET | `/api/stream/tags` | 变化的实时推送（SSE） |
 | GET | `/metrics` | Prometheus 指标 |
 | GET | `/openapi/v1.json` | OpenAPI 文档 |
@@ -371,7 +378,8 @@ cd web && npm run lint
 - [x] Modbus TCP 驱动
 - [x] Web 界面、设备模拟器、单文件与容器交付
 - [x] SQLite 配置存储 + Excel 导入导出
-- [ ] 点位配置的 Web 编辑
+- [x] 配置在线重载（Web 编辑的地基）
+- [ ] 点位配置的 Web 编辑界面
 - [ ] 真机验证与报文夹具替换
 - [ ] Modbus RTU（串口）、三菱 MC、欧姆龙 FINS
 - [x] MQTT 输出
