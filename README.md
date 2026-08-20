@@ -282,6 +282,7 @@ Modbus 报文实现，同源在这里不损失任何东西。）
 rung config import 点位表.xlsx --db /var/lib/rung/rung.db   # 导入（也吃 .json）
 rung config export 点位表.xlsx --db /var/lib/rung/rung.db   # 导出核对
 rung config list --db /var/lib/rung/rung.db                 # 看有哪些设备
+rung config check 点位表.xlsx --db /var/lib/rung/rung.db    # 离线校验，不连设备
 
 rung --db /var/lib/rung/rung.db          # CLI 从 SQLite 跑
 rung-host --Db /var/lib/rung/rung.db     # 宿主同理
@@ -301,6 +302,24 @@ rung-host --Db /var/lib/rung/rung.db     # 宿主同理
 ```
 
 一张几百行的表里错两行，让人改完重来一遍不如先把对的导进去。
+
+### 出差前先跑一遍 check
+
+地址解析、类型与地址宽度是否匹配、点位是否跨设备重名、批量合并成几次请求——
+这些全是纯逻辑，没有理由等到现场连上 PLC 才发现。
+
+```
+  line1-oven         s7              5 个点位 → 每轮 1 次请求，每轮取回 22 字节
+      ! Line1.Oven.Temp: DB 块号不能为 0
+      ! Line1.Oven.Pressure: 地址 DB1.DBW4 宽度为 2 字节，数据类型 Float32 需要 4 字节
+  line2-meter        profinet        5 个点位 → 每轮 0 次请求
+      ! line2-meter: 未知的协议 "profinet"，可用：s7 / modbus-tcp
+  ! 点位名重复：Line1.Oven.Temp（出现在 line1-oven、line1-robot）
+
+发现 4 个问题。请求次数按 PDU 240 的最保守假设估算，真机只会更少。
+```
+
+有问题时退出码为 1，可以直接挂进 CI 或交付前的检查脚本。
 
 数据库里枚举一律存字符串——有人拿 SQLite 浏览器打开时，看到 `Float32`
 比看到 `9` 有用得多。表结构用 EF Core Migrations 管理，启动时自动应用。

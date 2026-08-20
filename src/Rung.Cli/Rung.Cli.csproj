@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Rung.Drivers.S7.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
     <ProjectReference Include="..\Rung.Configuration\Rung.Configuration.csproj" />
     <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />

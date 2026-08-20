@@ -33,6 +33,7 @@ internal static class ConfigCommands
             "import" => await ImportAsync(args, store, output, cancellationToken).ConfigureAwait(false),
             "export" => await ExportAsync(args, store, output, cancellationToken).ConfigureAwait(false),
             "list" => await ListAsync(store, output, cancellationToken).ConfigureAwait(false),
+            "check" => await CheckAsync(args, store, output, cancellationToken).ConfigureAwait(false),
             _ => Usage(output),
         };
     }
@@ -119,6 +120,76 @@ internal static class ConfigCommands
         return 0;
     }
 
+    /// <summary>
+    /// 离线校验配置。不连接任何设备，因此出差前、交付前都可以随手跑一遍。
+    /// </summary>
+    private static async Task<int> CheckAsync(
+        string[] args, SqliteConfigStore store, TextWriter output, CancellationToken cancellationToken)
+    {
+        // 也允许直接校验一份 JSON 或 Excel，不必先导进数据库
+        var source = args.Length > 2 && !args[2].StartsWith("--", StringComparison.Ordinal)
+            ? args[2]
+            : null;
+
+        RungConfig config;
+
+        if (source is null)
+        {
+            config = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+            output.WriteLine($"校验 {store.DatabasePath}");
+        }
+        else if (source.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            config = TagExcel.Import(source, out var excelIssues);
+            output.WriteLine($"校验 {source}");
+
+            foreach (var issue in excelIssues)
+            {
+                output.WriteLine($"  ! {issue}");
+            }
+        }
+        else
+        {
+            config = RungConfig.Load(source);
+            output.WriteLine($"校验 {source}");
+        }
+
+        var results = ConfigChecker.Check(config);
+        var duplicates = ConfigChecker.FindDuplicateTagNames(config);
+        var problems = results.Sum(static r => r.Issues.Count) + duplicates.Count;
+
+        output.WriteLine();
+        foreach (var result in results)
+        {
+            var efficiency = result.FetchedBytes > 0
+                ? string.Create(CultureInfo.InvariantCulture, $"，每轮取回 {result.FetchedBytes} 字节")
+                : string.Empty;
+
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"  {result.DeviceId,-18} {result.Protocol,-12} "
+                + $"{result.TagCount,4} 个点位 → 每轮 {result.RequestCount} 次请求{efficiency}"));
+
+            foreach (var issue in result.Issues)
+            {
+                output.WriteLine($"      ! {issue}");
+            }
+        }
+
+        foreach (var duplicate in duplicates)
+        {
+            // 跨设备重名会让写命令落到错误的设备上，是代价最大的一类配置错误
+            output.WriteLine($"  ! 点位名重复：{duplicate}");
+        }
+
+        output.WriteLine();
+        output.WriteLine(problems == 0
+            ? $"未发现问题。共 {results.Count} 台设备，{results.Sum(static r => r.TagCount)} 个点位，"
+                + $"每轮 {results.Sum(static r => r.RequestCount)} 次请求。"
+            : $"发现 {problems} 个问题。请求次数按 PDU 240 的最保守假设估算，真机只会更少。");
+
+        return problems == 0 ? 0 : 1;
+    }
+
     private static int Usage(TextWriter output)
     {
         output.WriteLine("""
@@ -127,6 +198,8 @@ internal static class ConfigCommands
                   --merge   按设备标识合并，而不是整表替换
               rung config export <文件.xlsx> --db <数据库>            导出成 Excel
               rung config list --db <数据库>                          列出设备
+              rung config check --db <数据库>                         离线校验配置
+              rung config check <文件.json|.xlsx> --db <数据库>       校验文件而不必先导入
             """);
 
         return 1;
