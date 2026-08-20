@@ -69,6 +69,22 @@
       ]
     },
     {
+      "deviceId": "line4-packing",
+      "protocol": "omron-fins",
+      "host": "127.0.0.1",
+      "port": 19600,
+      "tags": [
+        { "name": "Line4.Pack.Count", "address": "D100", "dataType": "Int16",
+          "description": "封箱计数" },
+        { "name": "Line4.Pack.SealTemp", "address": "D200", "dataType": "Float32",
+          "byteOrder": "CDAB", "deadband": 0.2, "description": "封口温度 ℃" },
+        { "name": "Line4.Pack.Running", "address": "D300.00", "dataType": "Bool",
+          "description": "输送带运行" },
+        { "name": "Line4.Pack.LowMaterial", "address": "D300.05", "dataType": "Bool",
+          "description": "缺料报警" }
+      ]
+    },
+    {
       "deviceId": "line3-injection",
       "protocol": "melsec-mc",
       "host": "127.0.0.1",

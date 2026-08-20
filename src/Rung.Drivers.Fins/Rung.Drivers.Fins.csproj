@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Rung.Drivers.Fins</PackageId>
+    <Description>欧姆龙 FINS/UDP 驱动：异步传输、服务号校验、读写执行。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Protocols.Fins\Rung.Protocols.Fins.csproj" />
+  </ItemGroup>
+</Project>

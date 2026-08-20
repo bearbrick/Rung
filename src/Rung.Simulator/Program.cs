@@ -85,6 +85,7 @@ public static class Program
         var servers = new List<S7SimulatorServer>();
         var modbusServers = new List<ModbusSimulatorServer>();
         var melsecServers = new List<MelsecSimulatorServer>();
+        var finsServers = new List<FinsSimulatorServer>();
         RedisSimulatorServer? redis = null;
 
         try
@@ -140,6 +141,21 @@ public static class Program
                 }
             }
 
+            foreach (var device in config.FinsDevices)
+            {
+                var server = new FinsSimulatorServer(device);
+                finsServers.Add(server);
+
+                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"[{server.Name}] 监听 127.0.0.1:{server.Port}（欧姆龙 FINS/UDP），"
+                    + $"{device.Signals.Count} 个信号"));
+
+                foreach (var signal in device.Signals)
+                {
+                    output.WriteLine($"    {signal}  {signal.Description}");
+                }
+            }
+
             output.WriteLine();
             output.WriteLine("模拟器运行中，Ctrl+C 停止。");
 
@@ -164,6 +180,11 @@ public static class Program
             }
 
             foreach (var server in melsecServers)
+            {
+                await server.DisposeAsync().ConfigureAwait(false);
+            }
+
+            foreach (var server in finsServers)
             {
                 await server.DisposeAsync().ConfigureAwait(false);
             }

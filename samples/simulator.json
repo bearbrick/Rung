@@ -141,5 +141,33 @@
         }
       ]
     }
+  ],
+  "finsDevices": [
+    {
+      "name": "line4-packing",
+      "port": 19600,
+      "signals": [
+        {
+          "address": "D100", "type": "Int16",
+          "generator": "counter", "value": 0, "step": 1, "periodSeconds": 2,
+          "description": "封箱计数"
+        },
+        {
+          "address": "D200", "type": "Float32",
+          "generator": "sine", "min": 55, "max": 65, "periodSeconds": 20,
+          "description": "封口温度 ℃"
+        },
+        {
+          "address": "D300.00", "type": "Int16",
+          "generator": "toggle", "periodSeconds": 5,
+          "description": "输送带运行"
+        },
+        {
+          "address": "D300.05", "type": "Int16",
+          "generator": "toggle", "periodSeconds": 11,
+          "description": "缺料报警（与上一位同在 D300，只需一次读取）"
+        }
+      ]
+    }
   ]
 }

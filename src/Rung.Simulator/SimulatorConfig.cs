@@ -47,6 +47,9 @@ public sealed record SimulatorConfig
     /// <summary>要模拟的三菱 MELSEC CPU。</summary>
     public IReadOnlyList<SimulatedMelsecDeviceConfig> MelsecDevices { get; init; } = [];
 
+    /// <summary>要模拟的欧姆龙 CPU（FINS/UDP）。</summary>
+    public IReadOnlyList<SimulatedFinsDeviceConfig> FinsDevices { get; init; } = [];
+
     /// <summary>
     /// 是否同时起一个最小 Redis，用于验证北向输出。
     /// 开发机上不装 Redis、不装 Docker 也能把整条链路跑通。

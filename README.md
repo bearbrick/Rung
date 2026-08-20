@@ -125,6 +125,8 @@ src/
   Rung.Drivers.Modbus/     Modbus TCP 驱动：地址语义、批量合并、多从站
   Rung.Protocols.Melsec/   MELSEC MC 3E 纯编解码：地址解析、报文组包、批量合并
   Rung.Drivers.Melsec/     三菱驱动：异步传输、读写执行
+  Rung.Protocols.Fins/     欧姆龙 FINS 纯编解码：地址解析、报文组包、批量合并
+  Rung.Drivers.Fins/       欧姆龙驱动：FINS/UDP 传输、服务号校验
   Rung.Core/               采集内核：退避重连、分组调度、点位缓存、写队列、多设备编排
   Rung.Sinks.Redis/        Redis 北向输出
   Rung.Sinks.Mqtt/         MQTT 北向输出（保留消息 + 遗嘱消息）
@@ -202,6 +204,19 @@ S7-1200/1500 通常是 rack 0 / slot 1。
    按十进制读会读到隔壁的点。
 2. **32 位值低字在前。** 一个 Float32 占 D(n) 和 D(n+1)，D(n) 是低 16 位，
    因此这类点位的字节序通常要配成 `DCBA`。
+
+### 欧姆龙 FINS（UDP）
+
+`D100` `D100.05`（DM 区，位号 0-15）· `CIO200` `W10.03` `H5` `A50` · **全部十进制**
+
+- **32 位值是 CDAB**：低字在前、字内大端。
+  注意与三菱的 `DCBA` 不同——两家都低字在前，但字内字节序相反。
+  一个仓库里同时放这两种驱动，这类差异最容易带错。
+- **位就是"某个字的某一位"**，所以按字读回来再取位比逐位读高效得多：
+  同一个字里的 16 个布尔点位只要一次读取。
+- 走 UDP 而不是 FINS/TCP：欧姆龙以太网单元默认开的就是 UDP，也不需要节点协商握手。
+  代价是要自己处理丢包和乱序——每个请求带服务号，响应必须核对，
+  否则上一次超时的响应迟到时会被当成本次结果，读出属于上一轮的旧值。
 
 ### Modbus TCP
 
@@ -469,7 +484,8 @@ cd web && npm run lint
 - [x] Web 配置管理：Excel 下载 / 上传 / 校验 / 一键生效
 - [ ] 真机验证与报文夹具替换
 - [x] 三菱 MELSEC（MC 3E over TCP）
-- [ ] Modbus RTU（串口）、欧姆龙 FINS
+- [x] 欧姆龙 FINS（UDP）
+- [ ] Modbus RTU（串口）
 - [x] MQTT 输出
 
 ---

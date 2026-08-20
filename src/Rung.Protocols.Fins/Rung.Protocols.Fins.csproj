@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Rung.Protocols.Fins</PackageId>
+    <Description>欧姆龙 FINS 协议的纯编解码：地址解析、报文组包、响应解析。不含任何 IO。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
