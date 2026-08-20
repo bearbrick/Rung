@@ -59,6 +59,13 @@ public static class GatewayEndpoints
                 + " 校验失败时配置原封不动，不会留下一个改了一半的网关。")
             .RequireWrite();
 
+        api.MapGet("/audit", GetAudit)
+            .WithSummary("最近的写操作审计")
+            .WithDescription(
+                "谁、什么时候、往哪个点位写了什么值，以及设备回读到的实际值。"
+                + " 失败的尝试同样留痕。")
+            .RequireRead();
+
         // /metrics 按惯例挂在根上而不是 /api 下，抓取端默认就找这个路径
         app.MapGet("/metrics", GetMetrics)
             .WithTags("Rung")
@@ -98,6 +105,14 @@ public static class GatewayEndpoints
             return TypedResults.BadRequest(ex.Message);
         }
     }
+
+    private static async Task<Ok<IReadOnlyList<WriteAuditRecord>>> GetAudit(
+        IWriteAuditLog audit,
+        CancellationToken cancellationToken,
+        int limit = 100)
+        => TypedResults.Ok(await audit
+            .ReadRecentAsync(Math.Clamp(limit, 1, 1000), cancellationToken)
+            .ConfigureAwait(false));
 
     private static ContentHttpResult GetMetrics(GatewayHost gateway)
         => TypedResults.Text(

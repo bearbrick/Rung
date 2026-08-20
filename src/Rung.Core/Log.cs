@@ -53,6 +53,11 @@ internal static partial class Log
     public static partial void TagWritten(
         ILogger logger, string deviceId, string tagName, TagValue value, string address, string caller);
 
+    [LoggerMessage(EventId = 2002, Level = LogLevel.Error,
+        Message = "写审计落盘失败 {DeviceId}/{TagName}——操作已执行但没有留痕，请立刻检查磁盘")]
+    public static partial void AuditFailed(
+        ILogger logger, Exception exception, string deviceId, string tagName);
+
     [LoggerMessage(EventId = 2001, Level = LogLevel.Error,
         Message = "写入 {DeviceId}/{TagName} 失败")]
     public static partial void TagWriteFailed(

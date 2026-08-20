@@ -222,6 +222,7 @@ S7-1200/1500 通常是 rack 0 / slot 1。
 | POST | `/api/config/import` | 上传配置、校验通过后写入并在线生效 |
 | POST | `/api/config/reload` | 从配置源重新加载 |
 | GET | `/api/stream/tags` | 变化的实时推送（SSE） |
+| GET | `/api/audit` | 最近的写操作审计 |
 | GET | `/metrics` | Prometheus 指标 |
 | GET | `/openapi/v1.json` | OpenAPI 文档 |
 
@@ -282,6 +283,35 @@ info: 写入 line1-oven/Line1.Oven.Setpoint = 250 [Float64]（地址 DB1.DBW20�
 只存 SHA-256 哈希，不存明文——配置库会被备份、会被拷去排障。
 用 SHA-256 而不是 PBKDF2：慢哈希是为低熵的人类密码准备的，
 这里的密钥是 256 位随机数，本来就没有字典可查。
+
+## 写操作审计
+
+写审计**独立落盘**，因为这条日志的全部价值在于"出事之后能查到"——
+混在每秒都在刷的采集日志里，等于没有。
+
+```
+/var/lib/rung/audit/write-audit-2026-08-20.jsonl
+```
+
+```json
+{"timestampUtc":"2026-08-20T05:52:13.517Z","caller":"mes-system","deviceId":"line1-oven",
+ "tagName":"Line1.Oven.Setpoint","address":"DB1.DBW20","dataType":"Float64",
+ "requested":"266","actual":"266","success":true}
+```
+
+几个刻意的选择：
+
+- **JSON Lines，一行一条**。既能 `grep` 也能程序解析，追加写不必读取已有内容，
+  文件被截断也只损坏最后一行。换成 JSON 数组或 XML，"直接 tail 看最近发生了什么"
+  就不可能了
+- **按天分文件**。查审计的场景永远是"某天某个时间段出了事"，按天切正好对上
+- **每条立刻落盘**。写命令是低频的操作员动作，攒批换吞吐没有意义，
+  而进程崩掉时丢掉的正是最该查的那条
+- **追加前补齐换行**。上一次写到一半被杀会留下没有换行的半行，不补这个换行
+  下一条会接在它后面把好记录一起毁掉——一次崩溃损坏两条而不是一条
+- **失败的尝试同样留痕**。只记成功的审计，等于把"谁试图动了什么但没成"丢掉了
+- **审计失败不阻断写操作**。磁盘满了不该让操作员改不了设定值——
+  那个后果比丢一条审计记录严重得多，但会在普通日志里以 Error 级喊出来
 
 ## Web 界面
 

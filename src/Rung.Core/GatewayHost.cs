@@ -32,6 +32,7 @@ public sealed class GatewayHost : IAsyncDisposable
     private readonly IReadOnlyList<ITagSink> _sinks;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<GatewayHost> _logger;
+    private readonly IWriteAuditLog _audit;
 
     /// <summary>点位名到设备的路由。整体替换而不是就地改，读方无需加锁。</summary>
     private Dictionary<string, (DeviceWorker Worker, TagDef Tag)> _tagRoutes =
@@ -46,7 +47,8 @@ public sealed class GatewayHost : IAsyncDisposable
         IEnumerable<IDeviceDriverFactory> factories,
         TagCache cache,
         IReadOnlyList<ITagSink>? sinks = null,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        IWriteAuditLog? auditLog = null)
     {
         ArgumentNullException.ThrowIfNull(factories);
         ArgumentNullException.ThrowIfNull(cache);
@@ -57,6 +59,7 @@ public sealed class GatewayHost : IAsyncDisposable
         _sinks = sinks ?? [];
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
         _logger = _loggerFactory.CreateLogger<GatewayHost>();
+        _audit = auditLog ?? NullWriteAuditLog.Instance;
     }
 
     /// <summary>共享的点位缓存。北向接口从这里读。</summary>
@@ -256,7 +259,9 @@ public sealed class GatewayHost : IAsyncDisposable
             _cache,
             _sinks,
             registration.WorkerOptions,
-            _loggerFactory.CreateLogger<DeviceWorker>());
+            _loggerFactory.CreateLogger<DeviceWorker>(),
+            timeProvider: null,
+            auditLog: _audit);
 
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             _hostCancellation?.Token ?? CancellationToken.None);

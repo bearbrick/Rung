@@ -61,6 +61,11 @@ builder.Services.AddSingleton(rungConfig);
 builder.Services.AddSingleton(store);
 builder.Services.AddSingleton(new ApiKeyAuth(
     rungConfig.Auth?.ToApiKeys() ?? [], rungConfig.Auth?.RequireForReads ?? false));
+
+builder.Services.AddSingleton<IWriteAuditLog>(_ =>
+    rungConfig.Audit is { Enabled: true } audit
+        ? new JsonLinesWriteAuditLog(audit.Directory, audit.RetentionDays)
+        : NullWriteAuditLog.Instance);
 builder.Services.AddSingleton<TagCache>();
 builder.Services.AddSingleton<TagChangeBroadcaster>();
 builder.Services.AddSingleton<IDeviceDriverFactory, S7DriverFactory>();
@@ -101,7 +106,8 @@ builder.Services.AddSingleton(provider =>
         provider.GetServices<IDeviceDriverFactory>(),
         cache,
         sinks,
-        provider.GetRequiredService<ILoggerFactory>());
+        provider.GetRequiredService<ILoggerFactory>(),
+        provider.GetRequiredService<IWriteAuditLog>());
 
     foreach (var registration in GatewayEndpoints.ToRegistrations(rungConfig))
     {

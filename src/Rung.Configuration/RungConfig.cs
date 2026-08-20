@@ -47,6 +47,9 @@ public sealed record RungConfig
     /// <summary>接口认证。不配则等同于关闭——但写接口会被一并关掉，见 <see cref="AuthConfig"/>。</summary>
     public AuthConfig? Auth { get; init; }
 
+    /// <summary>写操作审计。不配则不落盘（但普通日志里仍有一行）。</summary>
+    public AuditConfig? Audit { get; init; }
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         ReadCommentHandling = JsonCommentHandling.Skip,
@@ -222,6 +225,25 @@ public sealed record ApiKeyConfig
 
     /// <summary>是否允许写点位。</summary>
     public bool CanWrite { get; init; }
+}
+
+/// <summary>
+/// 写操作审计配置。
+/// <para>
+/// 独立落盘，因为这条日志的全部价值在于"出事之后能查到"——
+/// 混在每秒都在刷的采集日志里，等于没有。
+/// </para>
+/// </summary>
+public sealed record AuditConfig
+{
+    /// <summary>是否启用。</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>存放目录。按天分文件，形如 <c>write-audit-2026-08-20.jsonl</c>。</summary>
+    public string Directory { get; init; } = "/var/lib/rung/audit";
+
+    /// <summary>保留天数，0 表示永久保留。</summary>
+    public int RetentionDays { get; init; } = 365;
 }
 
 /// <summary>断线重连配置。</summary>

@@ -28,6 +28,7 @@ public sealed class DeviceWorker : IAsyncDisposable
     private readonly IReadOnlyList<ITagSink> _sinks;
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
+    private readonly IWriteAuditLog _audit;
     private readonly PollGroup[] _groups;
     private readonly Channel<WriteCommand> _writes;
 
@@ -44,7 +45,8 @@ public sealed class DeviceWorker : IAsyncDisposable
         IReadOnlyList<ITagSink>? sinks = null,
         DeviceWorkerOptions? options = null,
         ILogger<DeviceWorker>? logger = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IWriteAuditLog? auditLog = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(deviceOptions);
@@ -58,6 +60,7 @@ public sealed class DeviceWorker : IAsyncDisposable
         _options = options ?? new DeviceWorkerOptions();
         _logger = (ILogger?)logger ?? NullLogger.Instance;
         _time = timeProvider ?? TimeProvider.System;
+        _audit = auditLog ?? NullWriteAuditLog.Instance;
 
         _groups = [.. tags
             .Where(static tag => tag.Enabled)
@@ -272,11 +275,17 @@ public sealed class DeviceWorker : IAsyncDisposable
                 command.Tag.Address, command.Caller);
 
             var actual = await ReadBackAsync(driver, command.Tag, cancellationToken).ConfigureAwait(false);
+
+            await AuditAsync(command, actual, error: null, cancellationToken).ConfigureAwait(false);
             command.Completion.TrySetResult(actual);
         }
         catch (Exception ex)
         {
             Log.TagWriteFailed(_logger, ex, _deviceOptions.DeviceId, command.Tag.Name);
+
+            // 失败也要留痕：只记成功的审计，等于把"谁试图动了什么但没成"这一半丢掉了
+            await AuditAsync(command, actual: null, ex.Message, CancellationToken.None)
+                .ConfigureAwait(false);
 
             command.Completion.TrySetException(ex);
 
@@ -284,6 +293,40 @@ public sealed class DeviceWorker : IAsyncDisposable
             throw;
         }
     }
+
+    /// <summary>
+    /// 落一条审计记录。
+    /// <para>
+    /// 审计失败不阻断写操作：磁盘满了不该让操作员改不了设定值——
+    /// 那个后果比丢一条审计记录严重得多。但要在普通日志里喊出来。
+    /// </para>
+    /// </summary>
+    private async Task AuditAsync(
+        WriteCommand command, TagValue? actual, string? error, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _audit.RecordAsync(new WriteAuditRecord(
+                _time.GetUtcNow().UtcDateTime,
+                command.Caller,
+                _deviceOptions.DeviceId,
+                command.Tag.Name,
+                command.Tag.Address,
+                command.Tag.DataType.ToString(),
+                FormatForAudit(command.Value),
+                actual is { } read ? FormatForAudit(read) : null,
+                error is null,
+                error), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.AuditFailed(_logger, ex, _deviceOptions.DeviceId, command.Tag.Name);
+        }
+    }
+
+    /// <summary>审计里的值只要数值本身，类型已经单独成列了。</summary>
+    private static string FormatForAudit(TagValue value)
+        => value.ToObject()?.ToString() ?? string.Empty;
 
     /// <summary>
     /// 写完立刻回读同一个点位。
