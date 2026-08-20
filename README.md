@@ -68,10 +68,11 @@ dotnet run --project src/Rung.Host -- --ConfigPath $PWD/samples/gateway.json
 想在终端里看数据流，`src/Rung.Cli` 是同一套内核的命令行形态：
 
 ```
-[line1-oven] PDU 240 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 0.2 ms
-[line1-robot] PDU 480 字节 · 3 个点位 → 每轮 1 次请求 · 上轮耗时 4.3 ms
-[line2-flaky] PDU 240 字节 · 1 个点位 → 每轮 1 次请求 · 上轮耗时 0.1 ms
-[line2-meter] PDU 250 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 6.2 ms
+[line1-oven] 单帧 240 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 0.2 ms
+[line1-robot] 单帧 480 字节 · 3 个点位 → 每轮 1 次请求 · 上轮耗时 4.3 ms
+[line2-meter] 单帧 250 字节 · 5 个点位 → 每轮 3 次请求 · 上轮耗时 6.0 ms
+[line3-injection] 单帧 1920 字节 · 5 个点位 → 每轮 5 次请求 · 上轮耗时 2.2 ms
+[line4-packing] 单帧 1980 字节 · 4 个点位 → 每轮 3 次请求 · 上轮耗时 2.2 ms
   Line1.Oven.Temp                     249.6   line1-oven/DB1.DBW0
   Line1.Robot.Angle                  25.577   line1-robot/DB10.DBD0
   Line2.Meter.Voltage               398.441   line2-meter/HR0
@@ -83,8 +84,9 @@ dotnet run --project src/Rung.Host -- --ConfigPath $PWD/samples/gateway.json
 15:51:21.830  Line1.Robot.Cycles                            3
 ```
 
-> Modbus 那行显示的 "PDU 250 字节" 是个措辞遗留：Modbus 不协商 PDU，
-> 250 是协议固定的单帧上限（125 个寄存器 × 2）。功能没错，用词该改。
+> 「单帧上限」是协议中立的说法：只有 S7 真的会协商一个 PDU 长度，
+> Modbus、MELSEC、FINS 的上限都是协议写死的。早先这里显示成
+> 「Modbus 设备 PDU 250 字节」，功能没错但用词误导，已经改掉。
 
 ---
 

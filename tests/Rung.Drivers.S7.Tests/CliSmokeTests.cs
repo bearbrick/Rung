@@ -65,7 +65,7 @@ public class CliSmokeTests : IDisposable
         var text = output.ToString();
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("[fake-plc] PDU 240 字节", text, StringComparison.Ordinal);
+        Assert.Contains("[fake-plc] 单帧 240 字节", text, StringComparison.Ordinal);
         Assert.Contains("2 个点位 → 每轮 1 次请求", text, StringComparison.Ordinal);
         Assert.Contains("235", text, StringComparison.Ordinal);
         Assert.Contains("true", text, StringComparison.Ordinal);

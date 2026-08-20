@@ -14,9 +14,9 @@ namespace Rung.Core;
 internal static partial class Log
 {
     [LoggerMessage(EventId = 1000, Level = LogLevel.Information,
-        Message = "设备 {DeviceId} 已连接，PDU {PduLength} 字节，{TagCount} 个点位编译成 {RequestCount} 次请求")]
+        Message = "设备 {DeviceId} 已连接，单帧上限 {MaxFrameBytes} 字节，{TagCount} 个点位编译成 {RequestCount} 次请求")]
     public static partial void DeviceConnected(
-        ILogger logger, string deviceId, int pduLength, int tagCount, int requestCount);
+        ILogger logger, string deviceId, int maxFrameBytes, int tagCount, int requestCount);
 
     /// <summary>
     /// 重连警告只带错误<b>信息</b>，不带异常对象。

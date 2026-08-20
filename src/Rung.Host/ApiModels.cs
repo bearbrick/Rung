@@ -54,7 +54,7 @@ public sealed record TagView(
 /// <param name="ConsecutiveFailures">连续失败次数。</param>
 /// <param name="ReconnectCount">累计重连次数。</param>
 /// <param name="LastPollMs">上一轮采集耗时，毫秒。</param>
-/// <param name="NegotiatedPduLength">协商的 PDU 长度。</param>
+/// <param name="MaxFrameBytes">单次报文的最大字节数。S7 是协商出来的，其余协议是写死的上限。</param>
 /// <param name="ActiveTagCount">参与采集的点位数。</param>
 /// <param name="RequestCount">每轮请求次数。</param>
 /// <param name="OverrunCount">采集超时次数。</param>
@@ -68,7 +68,7 @@ public sealed record DeviceView(
     int ConsecutiveFailures,
     int ReconnectCount,
     double LastPollMs,
-    int NegotiatedPduLength,
+    int MaxFrameBytes,
     int ActiveTagCount,
     int RequestCount,
     int OverrunCount,
@@ -88,7 +88,7 @@ public sealed record DeviceView(
             status.ConsecutiveFailures,
             status.ReconnectCount,
             Math.Round(status.LastPollDuration.TotalMilliseconds, 3),
-            status.NegotiatedPduLength,
+            status.MaxFrameBytes,
             status.ActiveTagCount,
             status.RequestCount,
             status.OverrunCount,

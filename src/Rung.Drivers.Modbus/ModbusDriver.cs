@@ -121,7 +121,7 @@ public sealed class ModbusDriver : IDeviceDriver
     /// Modbus 不协商 PDU，上限是协议固定的。这里报单次可读的最大字节数
     /// （125 个寄存器 × 2），让上层的诊断展示有个统一口径。
     /// </summary>
-    public int MaxPduLength => State == DriverState.Connected ? ModbusLimits.MaxReadRegisters * 2 : 0;
+    public int MaxFrameBytes => State == DriverState.Connected ? ModbusLimits.MaxReadRegisters * 2 : 0;
 
     /// <inheritdoc/>
     public ValueTask ConnectAsync(CancellationToken cancellationToken)

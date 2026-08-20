@@ -164,6 +164,7 @@ public sealed class RedisTagSink : ITagSink, IAsyncDisposable
                 new("overruns", status.OverrunCount),
                 new("tags", status.ActiveTagCount),
                 new("requests", status.RequestCount),
+                new("maxFrameBytes", status.MaxFrameBytes),
                 new("lastPollMs", Math.Round(status.LastPollDuration.TotalMilliseconds, 3)),
                 new("issues", status.Issues.Count),
             ];

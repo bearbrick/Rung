@@ -69,7 +69,7 @@ public sealed class MelsecDriver : IDeviceDriver
     public DriverState State { get; private set; } = DriverState.Disconnected;
 
     /// <summary>MC 不协商帧长，上限是协议固定的。这里报单次可读的最大字节数。</summary>
-    public int MaxPduLength => State == DriverState.Connected ? MelsecProtocol.MaxWordPoints * 2 : 0;
+    public int MaxFrameBytes => State == DriverState.Connected ? MelsecProtocol.MaxWordPoints * 2 : 0;
 
     /// <inheritdoc/>
     public async ValueTask ConnectAsync(CancellationToken cancellationToken)

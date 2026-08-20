@@ -59,10 +59,17 @@ public interface IDeviceDriver : IAsyncDisposable
     DriverState State { get; }
 
     /// <summary>
-    /// 协议协商后单次报文能承载的最大字节数。未连接时返回 0。
+    /// 单次报文能承载的最大字节数。未连接时返回 0。
+    /// <para>
+    /// 叫「单帧上限」而不是「PDU」，因为只有 S7 真的会协商一个 PDU 长度；
+    /// Modbus、MELSEC、FINS 的上限都是协议写死的。把 S7 的术语套到所有协议上，
+    /// 现场看到「Modbus 设备 PDU 250 字节」只会犯嘀咕——功能没错，但用词误导。
+    /// </para>
+    /// <para>
     /// 合并算法依赖它决定切分点，因此必须在 <see cref="ConnectAsync"/> 之后才有效。
+    /// </para>
     /// </summary>
-    int MaxPduLength { get; }
+    int MaxFrameBytes { get; }
 
     /// <summary>建立连接并完成协议协商。失败时抛出异常，由上层重连状态机决定退避策略。</summary>
     ValueTask ConnectAsync(CancellationToken cancellationToken);

@@ -199,7 +199,7 @@ public sealed class DeviceWorker : IAsyncDisposable
         {
             State = DriverState.Connected,
             ConsecutiveFailures = 0,
-            NegotiatedPduLength = driver.MaxPduLength,
+            MaxFrameBytes = driver.MaxFrameBytes,
             ActiveTagCount = _groups.Sum(static g => g.Plan!.Tags.Count) - issues.Count,
             RequestCount = _groups.Sum(static g => g.Plan!.RequestCount),
             Issues = issues,
@@ -207,7 +207,7 @@ public sealed class DeviceWorker : IAsyncDisposable
         });
 
         Log.DeviceConnected(
-            _logger, _deviceOptions.DeviceId, driver.MaxPduLength, Status.ActiveTagCount, Status.RequestCount);
+            _logger, _deviceOptions.DeviceId, driver.MaxFrameBytes, Status.ActiveTagCount, Status.RequestCount);
 
         await ServeAsync(driver, cancellationToken).ConfigureAwait(false);
     }

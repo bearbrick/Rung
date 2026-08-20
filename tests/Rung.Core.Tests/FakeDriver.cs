@@ -17,7 +17,7 @@ internal sealed class FakeDriver : IDeviceDriver
 
     public DriverState State { get; private set; } = DriverState.Disconnected;
 
-    public int MaxPduLength { get; private set; }
+    public int MaxFrameBytes { get; private set; }
 
     public int ConnectCount { get; private set; }
 
@@ -51,7 +51,7 @@ internal sealed class FakeDriver : IDeviceDriver
         }
 
         State = DriverState.Connected;
-        MaxPduLength = 240;
+        MaxFrameBytes = 240;
 
         return ValueTask.CompletedTask;
     }

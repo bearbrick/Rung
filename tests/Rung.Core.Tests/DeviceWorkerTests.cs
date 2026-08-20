@@ -309,7 +309,7 @@ public class DeviceWorkerTests
         var status = await RunUntilAsync(worker, () => driver.WaitForPollsAsync(1));
 
         Assert.Equal("dev1", status.DeviceId);
-        Assert.Equal(240, status.NegotiatedPduLength);
+        Assert.Equal(240, status.MaxFrameBytes);
         Assert.Equal(2, status.ActiveTagCount);
         Assert.Equal(1, status.RequestCount);
         Assert.NotNull(status.LastSuccessUtc);

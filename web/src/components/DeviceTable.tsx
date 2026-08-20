@@ -37,7 +37,15 @@ const columns: ColumnsType<DeviceView> = [
     // 这两个数放一起看，就知道批量合并的效果如何——现场调采集周期时最直观的指标
     render: (_, device) => `${device.activeTagCount} / ${device.requestCount}`,
   },
-  { title: 'PDU', dataIndex: 'negotiatedPduLength', align: 'right' },
+  {
+    // 不叫 PDU：只有 S7 真的协商 PDU，其余协议是协议写死的上限。
+    // 用 render 从行对象取值而不是靠 dataIndex——后者不受类型检查，
+    // 字段名改错时 UI 会静默显示一整列空白，而 lint 依然是绿的
+    title: '单帧上限',
+    key: 'maxFrameBytes',
+    align: 'right',
+    render: (_, device) => `${device.maxFrameBytes} B`,
+  },
   {
     title: '重连',
     dataIndex: 'reconnectCount',

@@ -77,7 +77,7 @@ public sealed class FinsDriver : IDeviceDriver
     public DriverState State { get; private set; } = DriverState.Disconnected;
 
     /// <summary>FINS 不协商帧长，上限由协议和 UDP 报文长度决定。</summary>
-    public int MaxPduLength => State == DriverState.Connected ? FinsProtocol.MaxWords * 2 : 0;
+    public int MaxFrameBytes => State == DriverState.Connected ? FinsProtocol.MaxWords * 2 : 0;
 
     /// <inheritdoc/>
     public ValueTask ConnectAsync(CancellationToken cancellationToken)

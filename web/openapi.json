@@ -255,10 +255,326 @@
           }
         }
       }
+    },
+    "/api/config/reload": {
+      "post": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "从配置源重新加载",
+        "description": "只有配置真的变了的设备会被重启，其余原地继续跑，采集不中断。 校验失败时配置原封不动，不会留下一个改了一半的网关。",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReloadView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "tags": [
+          "Rung"
+        ],
+        "summary": "最近的写操作审计",
+        "description": "谁、什么时候、往哪个点位写了什么值，以及设备回读到的实际值。 失败的尝试同样留痕。",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WriteAuditRecord"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "tags": [
+          "Rung 配置"
+        ],
+        "summary": "当前配置摘要",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigSummaryView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/export": {
+      "get": {
+        "tags": [
+          "Rung 配置"
+        ],
+        "summary": "导出点位表为 Excel",
+        "description": "导出的文件改完可以直接上传回来。",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/config/validate": {
+      "post": {
+        "tags": [
+          "Rung 配置"
+        ],
+        "summary": "只校验上传的配置，不写入",
+        "description": "上传 .xlsx 或 .json，逐行报出问题。不改变任何现有配置。",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigCheckView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/import": {
+      "post": {
+        "tags": [
+          "Rung 配置"
+        ],
+        "summary": "导入配置并立即生效",
+        "description": "上传 .xlsx 或 .json。先校验，有问题就整份拒绝；通过之后写入并在线重载，只有配置真的变了的设备会被重启。",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ConfigCheckView": {
+        "required": [
+          "devices",
+          "duplicateTagNames",
+          "fileIssues",
+          "tagCount",
+          "requestCount",
+          "problemCount"
+        ],
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceCheckView"
+            },
+            "description": "逐设备结果。"
+          },
+          "duplicateTagNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "跨设备重复的点位名。"
+          },
+          "fileIssues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "解析文件时逐行发现的问题（仅 Excel）。"
+          },
+          "tagCount": {
+            "type": "integer",
+            "description": "点位总数。",
+            "format": "int32"
+          },
+          "requestCount": {
+            "type": "integer",
+            "description": "每轮请求总数。",
+            "format": "int32"
+          },
+          "problemCount": {
+            "type": "integer",
+            "description": "问题总数。",
+            "format": "int32"
+          }
+        },
+        "description": "整份配置的校验结果。"
+      },
+      "ConfigSummaryView": {
+        "required": [
+          "source",
+          "writable",
+          "deviceCount",
+          "tagCount"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "来源描述。"
+          },
+          "writable": {
+            "type": "boolean",
+            "description": "是否可在线修改。JSON 文件来源为只读。"
+          },
+          "deviceCount": {
+            "type": "integer",
+            "description": "设备数。",
+            "format": "int32"
+          },
+          "tagCount": {
+            "type": "integer",
+            "description": "点位数。",
+            "format": "int32"
+          }
+        },
+        "description": "配置来源摘要。"
+      },
+      "DeviceCheckView": {
+        "required": [
+          "deviceId",
+          "protocol",
+          "tagCount",
+          "requestCount",
+          "issues"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "设备标识。"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "协议。"
+          },
+          "tagCount": {
+            "type": "integer",
+            "description": "点位数。",
+            "format": "int32"
+          },
+          "requestCount": {
+            "type": "integer",
+            "description": "每轮请求次数。",
+            "format": "int32"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagIssueView"
+            },
+            "description": "配置问题。"
+          }
+        },
+        "description": "一台设备的校验结果。"
+      },
       "DeviceView": {
         "required": [
           "deviceId",
@@ -269,7 +585,7 @@
           "consecutiveFailures",
           "reconnectCount",
           "lastPollMs",
-          "negotiatedPduLength",
+          "maxFrameBytes",
           "activeTagCount",
           "requestCount",
           "overrunCount",
@@ -323,9 +639,9 @@
             "description": "上一轮采集耗时，毫秒。",
             "format": "double"
           },
-          "negotiatedPduLength": {
+          "maxFrameBytes": {
             "type": "integer",
-            "description": "协商的 PDU 长度。",
+            "description": "单次报文的最大字节数。S7 是协商出来的，其余协议是写死的上限。",
             "format": "int32"
           },
           "activeTagCount": {
@@ -396,7 +712,104 @@
         },
         "description": "网关整体健康状况。"
       },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
+      },
+      "ImportView": {
+        "required": [
+          "devices",
+          "added",
+          "restarted",
+          "removed",
+          "unchanged"
+        ],
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceCheckView"
+            },
+            "description": "导入的设备校验结果。"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "新启动的设备。"
+          },
+          "restarted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "被重启的设备。"
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "被移除的设备。"
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "原地继续跑的设备。"
+          }
+        },
+        "description": "导入并生效的结果。"
+      },
       "JsonElement": { },
+      "ReloadView": {
+        "required": [
+          "source",
+          "added",
+          "restarted",
+          "removed",
+          "unchanged"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "配置来源描述。"
+          },
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "新启动的设备。"
+          },
+          "restarted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "配置变了、被重启的设备。"
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "被移除的设备。"
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "配置未变、原地继续跑的设备。"
+          }
+        },
+        "description": "一次配置重载的结果。"
+      },
       "SseItemOfTagView": {
         "type": "object",
         "properties": {
@@ -493,6 +906,71 @@
         },
         "description": "    一个点位的对外表示。\n    刻意不暴露 TagValue 本身：它是为热路径设计的紧凑结构体，\n换成 JSON 友好的形状之后，接口契约才能独立于内部实现演进。"
       },
+      "WriteAuditRecord": {
+        "required": [
+          "timestampUtc",
+          "caller",
+          "deviceId",
+          "tagName",
+          "address",
+          "dataType",
+          "requested",
+          "actual",
+          "success",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "timestampUtc": {
+            "type": "string",
+            "description": "操作时刻，UTC。",
+            "format": "date-time"
+          },
+          "caller": {
+            "type": "string",
+            "description": "调用方名称，来自 API 密钥。"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "设备标识。"
+          },
+          "tagName": {
+            "type": "string",
+            "description": "业务点位名。"
+          },
+          "address": {
+            "type": "string",
+            "description": "协议地址。排障时手头只有审计文件也能直接看懂。"
+          },
+          "dataType": {
+            "type": "string",
+            "description": "数据类型。拆成独立字段而不是拼进值里——\n            选 JSON Lines 就是为了机器也能解析，让消费方去拆 \"266 [Float64]\" 这种复合串\n            是把方便留给自己、麻烦留给别人。"
+          },
+          "requested": {
+            "type": "string",
+            "description": "请求写入的工程值。"
+          },
+          "actual": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "写完从设备回读到的实际值；失败时为空。"
+          },
+          "success": {
+            "type": "boolean",
+            "description": "是否成功。"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "失败原因。"
+          }
+        },
+        "description": "一条写操作的审计记录。"
+      },
       "WriteTagRequest": {
         "required": [
           "value"
@@ -511,6 +989,9 @@
   "tags": [
     {
       "name": "Rung"
+    },
+    {
+      "name": "Rung 配置"
     }
   ]
 }

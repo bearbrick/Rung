@@ -41,7 +41,7 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
 
         Assert.Equal("oven", device.DeviceId);
         Assert.Equal("Connected", device.State);
-        Assert.Equal(240, device.NegotiatedPduLength);
+        Assert.Equal(240, device.MaxFrameBytes);
         Assert.Equal(4, device.ActiveTagCount);
         Assert.NotNull(device.LastSuccessUtc);
         Assert.Empty(device.Issues);

@@ -41,7 +41,7 @@ public class S7DriverTests
         await driver.ConnectAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(DriverState.Connected, driver.State);
-        Assert.Equal(480, driver.MaxPduLength);
+        Assert.Equal(480, driver.MaxFrameBytes);
     }
 
     [Fact]

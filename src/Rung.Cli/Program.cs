@@ -222,7 +222,7 @@ public static class Program
     private static void PrintDeviceSummary(DeviceStatus status, TextWriter output)
     {
         output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-            $"[{status.DeviceId}] PDU {status.NegotiatedPduLength} 字节 · "
+            $"[{status.DeviceId}] 单帧 {status.MaxFrameBytes} 字节 · "
             + $"{status.ActiveTagCount} 个点位 → 每轮 {status.RequestCount} 次请求 · "
             + $"上轮耗时 {status.LastPollDuration.TotalMilliseconds:F1} ms"));
 

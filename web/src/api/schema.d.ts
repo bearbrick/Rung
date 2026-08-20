@@ -317,10 +317,340 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 从配置源重新加载
+         * @description 只有配置真的变了的设备会被重启，其余原地继续跑，采集不中断。 校验失败时配置原封不动，不会留下一个改了一半的网关。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReloadView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 最近的写操作审计
+         * @description 谁、什么时候、往哪个点位写了什么值，以及设备回读到的实际值。 失败的尝试同样留痕。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WriteAuditRecord"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 当前配置摘要 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigSummaryView"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 导出点位表为 Excel
+         * @description 导出的文件改完可以直接上传回来。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 只校验上传的配置，不写入
+         * @description 上传 .xlsx 或 .json，逐行报出问题。不改变任何现有配置。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        file: components["schemas"]["IFormFile"];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigCheckView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 导入配置并立即生效
+         * @description 上传 .xlsx 或 .json。先校验，有问题就整份拒绝；通过之后写入并在线重载，只有配置真的变了的设备会被重启。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        file: components["schemas"]["IFormFile"];
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ImportView"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description 整份配置的校验结果。 */
+        ConfigCheckView: {
+            /** @description 逐设备结果。 */
+            devices: components["schemas"]["DeviceCheckView"][];
+            /** @description 跨设备重复的点位名。 */
+            duplicateTagNames: string[];
+            /** @description 解析文件时逐行发现的问题（仅 Excel）。 */
+            fileIssues: string[];
+            /**
+             * Format: int32
+             * @description 点位总数。
+             */
+            tagCount: number;
+            /**
+             * Format: int32
+             * @description 每轮请求总数。
+             */
+            requestCount: number;
+            /**
+             * Format: int32
+             * @description 问题总数。
+             */
+            problemCount: number;
+        };
+        /** @description 配置来源摘要。 */
+        ConfigSummaryView: {
+            /** @description 来源描述。 */
+            source: string;
+            /** @description 是否可在线修改。JSON 文件来源为只读。 */
+            writable: boolean;
+            /**
+             * Format: int32
+             * @description 设备数。
+             */
+            deviceCount: number;
+            /**
+             * Format: int32
+             * @description 点位数。
+             */
+            tagCount: number;
+        };
+        /** @description 一台设备的校验结果。 */
+        DeviceCheckView: {
+            /** @description 设备标识。 */
+            deviceId: string;
+            /** @description 协议。 */
+            protocol: string;
+            /**
+             * Format: int32
+             * @description 点位数。
+             */
+            tagCount: number;
+            /**
+             * Format: int32
+             * @description 每轮请求次数。
+             */
+            requestCount: number;
+            /** @description 配置问题。 */
+            issues: components["schemas"]["TagIssueView"][];
+        };
         /** @description 一台设备的对外状况。 */
         DeviceView: {
             /** @description 设备标识。 */
@@ -356,9 +686,9 @@ export interface components {
             lastPollMs: number;
             /**
              * Format: int32
-             * @description 协商的 PDU 长度。
+             * @description 单次报文的最大字节数。S7 是协商出来的，其余协议是写死的上限。
              */
-            negotiatedPduLength: number;
+            maxFrameBytes: number;
             /**
              * Format: int32
              * @description 参与采集的点位数。
@@ -407,7 +737,35 @@ export interface components {
              */
             uptimeSeconds: number;
         };
+        /** Format: binary */
+        IFormFile: string;
+        /** @description 导入并生效的结果。 */
+        ImportView: {
+            /** @description 导入的设备校验结果。 */
+            devices: components["schemas"]["DeviceCheckView"][];
+            /** @description 新启动的设备。 */
+            added: string[];
+            /** @description 被重启的设备。 */
+            restarted: string[];
+            /** @description 被移除的设备。 */
+            removed: string[];
+            /** @description 原地继续跑的设备。 */
+            unchanged: string[];
+        };
         JsonElement: unknown;
+        /** @description 一次配置重载的结果。 */
+        ReloadView: {
+            /** @description 配置来源描述。 */
+            source: string;
+            /** @description 新启动的设备。 */
+            added: string[];
+            /** @description 配置变了、被重启的设备。 */
+            restarted: string[];
+            /** @description 被移除的设备。 */
+            removed: string[];
+            /** @description 配置未变、原地继续跑的设备。 */
+            unchanged: string[];
+        };
         SseItemOfTagView: {
             data?: components["schemas"]["TagView"];
             eventType?: null | string;
@@ -446,6 +804,36 @@ export interface components {
             dataType: string;
             /** @description 描述。 */
             description: null | string;
+        };
+        /** @description 一条写操作的审计记录。 */
+        WriteAuditRecord: {
+            /**
+             * Format: date-time
+             * @description 操作时刻，UTC。
+             */
+            timestampUtc: string;
+            /** @description 调用方名称，来自 API 密钥。 */
+            caller: string;
+            /** @description 设备标识。 */
+            deviceId: string;
+            /** @description 业务点位名。 */
+            tagName: string;
+            /** @description 协议地址。排障时手头只有审计文件也能直接看懂。 */
+            address: string;
+            /**
+             * @description 数据类型。拆成独立字段而不是拼进值里——
+             *                 选 JSON Lines 就是为了机器也能解析，让消费方去拆 "266 [Float64]" 这种复合串
+             *                 是把方便留给自己、麻烦留给别人。
+             */
+            dataType: string;
+            /** @description 请求写入的工程值。 */
+            requested: string;
+            /** @description 写完从设备回读到的实际值；失败时为空。 */
+            actual: null | string;
+            /** @description 是否成功。 */
+            success: boolean;
+            /** @description 失败原因。 */
+            error: null | string;
         };
         /** @description 写点位的请求体。 */
         WriteTagRequest: {

@@ -48,7 +48,7 @@ public sealed class S7Driver : IDeviceDriver
     public DriverState State { get; private set; } = DriverState.Disconnected;
 
     /// <inheritdoc/>
-    public int MaxPduLength { get; private set; }
+    public int MaxFrameBytes { get; private set; }
 
     /// <inheritdoc/>
     public async ValueTask ConnectAsync(CancellationToken cancellationToken)
@@ -84,7 +84,7 @@ public sealed class S7Driver : IDeviceDriver
         _ = cancellationToken;
 
         CloseSocket();
-        MaxPduLength = 0;
+        MaxFrameBytes = 0;
         State = DriverState.Disconnected;
 
         return ValueTask.CompletedTask;
@@ -97,7 +97,7 @@ public sealed class S7Driver : IDeviceDriver
 
         return S7ReadPlanner.Create(
             tags,
-            MaxPduLength,
+            MaxFrameBytes,
             new S7ReadPlannerOptions { MaxGapBytes = _s7Options.MaxGapBytes });
     }
 
@@ -199,7 +199,7 @@ public sealed class S7Driver : IDeviceDriver
             _sendBuffer, NextPduReference(), _s7Options.RequestedPduLength);
 
         frameLength = await ExchangeAsync(length, cancellationToken).ConfigureAwait(false);
-        MaxPduLength = S7ResponseReader.ReadNegotiatedPduLength(_receiveBuffer.AsSpan(0, frameLength));
+        MaxFrameBytes = S7ResponseReader.ReadNegotiatedPduLength(_receiveBuffer.AsSpan(0, frameLength));
     }
 
     private async ValueTask<int> ExchangeReadAsync(

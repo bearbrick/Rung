@@ -35,8 +35,10 @@ public sealed record DeviceStatus
     /// <summary>最近一轮采集的耗时。</summary>
     public TimeSpan LastPollDuration { get; init; }
 
-    /// <summary>协商得到的 PDU 长度。</summary>
-    public int NegotiatedPduLength { get; init; }
+    /// <summary>
+    /// 单次报文能承载的最大字节数。S7 是协商出来的，其余协议是写死的上限。
+    /// </summary>
+    public int MaxFrameBytes { get; init; }
 
     /// <summary>参与采集的点位数。</summary>
     public int ActiveTagCount { get; init; }
