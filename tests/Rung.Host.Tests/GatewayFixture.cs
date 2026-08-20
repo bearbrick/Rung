@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Rung.Abstractions;
 using Rung.Simulator;
 using Xunit;
 
@@ -19,8 +20,20 @@ public sealed class GatewayFixture : IAsyncLifetime
     /// <summary>模拟设备，可用来注入故障或核对写入结果。</summary>
     public S7SimulatorServer Plc { get; private set; } = null!;
 
-    /// <summary>指向宿主的 HTTP 客户端。</summary>
+    /// <summary>
+    /// 指向宿主的 HTTP 客户端，已带上可写密钥。
+    /// <para>
+    /// 夹具里配一把真密钥而不是关掉认证：这样写路径的每个用例
+    /// 都顺带验证了认证链路是通的，而不是绕过它。
+    /// </para>
+    /// </summary>
     public HttpClient Client { get; private set; } = null!;
+
+    /// <summary>不带任何密钥的客户端，用来验证拒绝路径。</summary>
+    public HttpClient Anonymous { get; private set; } = null!;
+
+    /// <summary>夹具使用的可写密钥明文。</summary>
+    public string WriteKey { get; } = ApiKeys.Generate();
 
     public async ValueTask InitializeAsync()
     {
@@ -46,6 +59,11 @@ public sealed class GatewayFixture : IAsyncLifetime
             {
               "version": 1,
               "pollIntervalMs": 100,
+              "auth": {
+                "keys": [
+                  { "name": "test-writer", "hash": "{{ApiKeys.ComputeHash(WriteKey)}}", "canWrite": true }
+                ]
+              },
               "devices": [
                 {
                   "deviceId": "oven",
@@ -67,7 +85,10 @@ public sealed class GatewayFixture : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.UseSetting("ConfigPath", _configPath));
 
+        Anonymous = _factory.CreateClient();
+
         Client = _factory.CreateClient();
+        Client.DefaultRequestHeaders.Add("X-Rung-Key", WriteKey);
 
         // 等第一轮采集落进缓存，之后所有断言才有意义
         await WaitForFirstPollAsync();
@@ -92,6 +113,7 @@ public sealed class GatewayFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         Client?.Dispose();
+        Anonymous?.Dispose();
 
         if (_factory is not null)
         {

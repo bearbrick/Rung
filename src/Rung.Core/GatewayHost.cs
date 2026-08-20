@@ -316,7 +316,11 @@ public sealed class GatewayHost : IAsyncDisposable
 
     /// <summary>按业务点位名下发写命令，返回回读到的设备实际值。</summary>
     /// <exception cref="RungException">点位名不存在。</exception>
-    public Task<TagValue> WriteAsync(string tagName, TagValue value, CancellationToken cancellationToken)
+    public Task<TagValue> WriteAsync(
+        string tagName,
+        TagValue value,
+        CancellationToken cancellationToken,
+        string caller = "unknown")
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -325,7 +329,7 @@ public sealed class GatewayHost : IAsyncDisposable
             throw new RungException($"未知的点位名 \"{tagName}\"");
         }
 
-        return route.Worker.WriteAsync(route.Tag, value, cancellationToken);
+        return route.Worker.WriteAsync(route.Tag, value, cancellationToken, caller);
     }
 
     /// <summary>该业务点位挂在哪台设备上。</summary>

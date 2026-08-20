@@ -248,6 +248,39 @@ Redis 是「拉」、MQTT 是「推」，互不影响，可以同时开。
 
 ---
 
+## 接口认证
+
+**写接口永远需要密钥。** 它能让产线上的机器真的动起来，因此没有配置任何密钥时
+写接口<b>直接关闭</b>，而不是放开——失败要往关的方向倒，配置漏了就把 PLC
+写权限对全网敞开是这类系统最典型的事故成因。
+
+**读接口默认放开。** 车间里的看板、报表、班组终端都要读数，给每一个都发密钥
+在现实里推不动，而读数据的风险等级和写 PLC 完全不同。需要严格管控时
+把 `auth.requireForReads` 打开。健康检查永远不认证——它要给监控探针用。
+
+```bash
+rung config key add mes-system --write --db /var/lib/rung/rung.db
+```
+
+```
+已生成密钥 "mes-system"（可读写）：
+
+    rung_JpIDQALNMjPB55Nzhn-n74n1lzKSBOiI8IU4QC5hzJs
+
+请立刻保存——它只显示这一次，库里存的是哈希，找不回来。
+```
+
+调用时放进 `X-Rung-Key` 头（也接受 `Authorization: Bearer`）。
+**密钥名会进写审计日志**，这是审计能落地的前提：
+
+```
+info: 写入 line1-oven/Line1.Oven.Setpoint = 250 [Float64]（地址 DB1.DBW20，调用方 mes-system）
+```
+
+只存 SHA-256 哈希，不存明文——配置库会被备份、会被拷去排障。
+用 SHA-256 而不是 PBKDF2：慢哈希是为低熵的人类密码准备的，
+这里的密钥是 256 位随机数，本来就没有字典可查。
+
 ## Web 界面
 
 React 19 + TypeScript + Vite + Ant Design，构建产物输出到 `Rung.Host/wwwroot`，
@@ -257,6 +290,7 @@ React 19 + TypeScript + Vite + Ant Design，构建产物输出到 `Rung.Host/www
 - **设备状况**：连接状态、上轮耗时、`点位/请求` 比、重连与超时次数，可展开看配置问题
 - **手动读写**：现场调试省一半时间，不用开博途也不用写临时脚本
 - **配置管理**：下载 Excel → 在 Excel 里改 → 上传校验 → 一键生效
+- **API 密钥**：存 sessionStorage，关掉标签页就没了——车间电脑往往多人共用
 
 **刻意不做网页版的点位表格编辑器。** 几百行点位在网页表格里改，
 体验一定不如 Excel，而电气工程师手上本来就是 Excel。做那个是把力气

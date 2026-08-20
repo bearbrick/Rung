@@ -16,39 +16,48 @@ public static class GatewayEndpoints
 
         var api = app.MapGroup("/api").WithTags("Rung");
 
+        // 健康检查永远不认证：它要给监控探针和容器编排器用，
+        // 那些东西不该也不方便持有密钥
         api.MapGet("/health", GetHealth)
             .WithSummary("网关整体健康状况")
             .WithDescription("有设备掉线时 status 为 degraded。适合直接接监控探针。");
 
         api.MapGet("/devices", GetDevices)
-            .WithSummary("全部设备的运行状况");
+            .WithSummary("全部设备的运行状况")
+            .RequireRead();
 
         api.MapGet("/devices/{deviceId}", GetDevice)
-            .WithSummary("单台设备的运行状况");
+            .WithSummary("单台设备的运行状况")
+            .RequireRead();
 
         api.MapGet("/tags", GetTags)
             .WithSummary("点位最新值")
-            .WithDescription("可用 device 与 prefix 过滤。prefix 按业务名前缀匹配。");
+            .WithDescription("可用 device 与 prefix 过滤。prefix 按业务名前缀匹配。")
+            .RequireRead();
 
         api.MapGet("/tags/{tagName}", GetTag)
-            .WithSummary("单个点位的最新值");
+            .WithSummary("单个点位的最新值")
+            .RequireRead();
 
         api.MapPost("/tags/{tagName}/write", WriteTag)
             .WithSummary("写入点位")
             .WithDescription(
                 "值按点位声明的数据类型解释。写完会记审计日志，并回读设备上的真实值。"
                 + " 路径上显式写出 write 而不是用 PUT：这个动作会让产线上的机器真的动起来，"
-                + " 一眼看得出比符合 REST 惯例更重要。");
+                + " 一眼看得出比符合 REST 惯例更重要。")
+            .RequireWrite();
 
         api.MapGet("/stream/tags", StreamTags)
             .WithSummary("点位变化的实时推送（SSE）")
-            .WithDescription("只推送越过死区的变化。浏览器用 EventSource 订阅，自带断线重连。");
+            .WithDescription("只推送越过死区的变化。浏览器用 EventSource 订阅，自带断线重连。")
+            .RequireRead();
 
         api.MapPost("/config/reload", ReloadConfig)
             .WithSummary("从配置源重新加载")
             .WithDescription(
                 "只有配置真的变了的设备会被重启，其余原地继续跑，采集不中断。"
-                + " 校验失败时配置原封不动，不会留下一个改了一半的网关。");
+                + " 校验失败时配置原封不动，不会留下一个改了一半的网关。")
+            .RequireWrite();
 
         // /metrics 按惯例挂在根上而不是 /api 下，抓取端默认就找这个路径
         app.MapGet("/metrics", GetMetrics)
@@ -144,6 +153,7 @@ public static class GatewayEndpoints
 
     private static async Task<Results<Ok<TagView>, NotFound<string>, BadRequest<string>>> WriteTag(
         GatewayHost gateway,
+        HttpContext context,
         string tagName,
         WriteTagRequest request,
         CancellationToken cancellationToken)
@@ -162,7 +172,9 @@ public static class GatewayEndpoints
         try
         {
             var value = TagValueConverter.FromJson(request.Value, tag, DateTime.UtcNow);
-            actual = await gateway.WriteAsync(tagName, value, cancellationToken).ConfigureAwait(false);
+            actual = await gateway
+                .WriteAsync(tagName, value, cancellationToken, context.GetCaller().Name)
+                .ConfigureAwait(false);
         }
         catch (RungException ex)
         {

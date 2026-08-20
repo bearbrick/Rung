@@ -1,8 +1,10 @@
-import { Alert, App, Button, Card, Descriptions, Space, Table, Tag, Typography, Upload } from 'antd';
+import {
+  Alert, App, Button, Card, Descriptions, Input, Space, Table, Tag, Typography, Upload,
+} from 'antd';
 import type { UploadFile } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { api } from '../api/client';
+import { api, apiKey } from '../api/client';
 import type { ConfigCheck, ImportResult } from '../api/client';
 
 /**
@@ -18,6 +20,7 @@ export function ConfigPanel() {
   const [imported, setImported] = useState<ImportResult | null>(null);
   const [pending, setPending] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [key, setKey] = useState(apiKey.get());
 
   const summary = useQuery({
     queryKey: ['config'],
@@ -86,6 +89,25 @@ export function ConfigPanel() {
         </Descriptions>
       </Card>
 
+      <Card size="small" title="API 密钥">
+        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+            写点位、导入配置需要密钥。用 <Typography.Text code>rung config key add
+            &lt;名称&gt; --write</Typography.Text> 生成。
+            密钥只存在本次会话里，关掉标签页就没了。
+          </Typography.Paragraph>
+          <Input.Password
+            style={{ maxWidth: 480 }}
+            placeholder="rung_…"
+            value={key}
+            onChange={(event) => {
+              setKey(event.target.value);
+              apiKey.set(event.target.value.trim());
+            }}
+          />
+        </Space>
+      </Card>
+
       <Card size="small" title="点位表">
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
@@ -94,7 +116,20 @@ export function ConfigPanel() {
           </Typography.Paragraph>
 
           <Space wrap>
-            <Button href="/api/config/export" download>
+            <Button
+              onClick={() =>
+                void run(async () => {
+                  // 下载也要带密钥，所以不能用普通的 <a download>
+                  const blob = await api.exportConfig();
+                  const url = URL.createObjectURL(blob);
+                  const anchor = document.createElement('a');
+                  anchor.href = url;
+                  anchor.download = `rung-tags-${new Date().toISOString().slice(0, 10)}.xlsx`;
+                  anchor.click();
+                  URL.revokeObjectURL(url);
+                })
+              }
+            >
               下载点位表（Excel）
             </Button>
 

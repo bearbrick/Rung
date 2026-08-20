@@ -1,7 +1,31 @@
 import type { DeviceView, HealthView, TagView } from './types';
 
+const KeyStorageKey = 'rung.apiKey';
+
+/**
+ * API 密钥。
+ *
+ * 存 sessionStorage 而不是 localStorage：关掉标签页就没了。
+ * 车间里的电脑往往是多人共用的，密钥长期躺在浏览器里等于没设密钥。
+ */
+export const apiKey = {
+  get: () => sessionStorage.getItem(KeyStorageKey) ?? '',
+  set: (value: string) => {
+    if (value) {
+      sessionStorage.setItem(KeyStorageKey, value);
+    } else {
+      sessionStorage.removeItem(KeyStorageKey);
+    }
+  },
+};
+
+function authHeaders(): HeadersInit {
+  const key = apiKey.get();
+  return key ? { 'X-Rung-Key': key } : {};
+}
+
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, { signal });
+  const response = await fetch(path, { signal, headers: authHeaders() });
   if (!response.ok) {
     throw new Error(`${path} 返回 ${response.status}：${await response.text()}`);
   }
@@ -44,7 +68,7 @@ async function postFile<T>(path: string, file: File): Promise<T> {
   const body = new FormData();
   body.append('file', file);
 
-  const response = await fetch(path, { method: 'POST', body });
+  const response = await fetch(path, { method: 'POST', body, headers: authHeaders() });
   if (!response.ok) {
     throw new Error(await response.text());
   }
@@ -59,6 +83,16 @@ export const api = {
 
   config: (signal?: AbortSignal) => getJson<ConfigSummary>('/api/config', signal),
 
+  /** 下载点位表。带密钥，所以不能用普通的 <a download>。 */
+  async exportConfig(): Promise<Blob> {
+    const response = await fetch('/api/config/export', { headers: authHeaders() });
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    return await response.blob();
+  },
+
   /** 校验上传的配置，不写入任何东西。 */
   validateConfig: (file: File) => postFile<ConfigCheck>('/api/config/validate', file),
 
@@ -72,7 +106,7 @@ export const api = {
   async write(tagName: string, value: unknown): Promise<TagView> {
     const response = await fetch(`/api/tags/${encodeURIComponent(tagName)}/write`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ value }),
     });
 

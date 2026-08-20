@@ -92,8 +92,19 @@ public sealed class DeviceWorker : IAsyncDisposable
     /// 每次写都会记一条 Information 级审计日志——谁、什么时候、往哪个点位写了什么值。
     /// </para>
     /// </summary>
+    /// <param name="tag">要写的点位。</param>
+    /// <param name="value">工程值。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <param name="caller">
+    /// 调用方名称，写进审计日志。产线上出了事，这条日志是唯一能还原
+    /// "谁、什么时候、往哪个点位写了什么"的东西——没有调用方，审计就只剩一半。
+    /// </param>
     /// <returns>回读到的设备实际值。</returns>
-    public async Task<TagValue> WriteAsync(TagDef tag, TagValue value, CancellationToken cancellationToken)
+    public async Task<TagValue> WriteAsync(
+        TagDef tag,
+        TagValue value,
+        CancellationToken cancellationToken,
+        string caller = "unknown")
     {
         ArgumentNullException.ThrowIfNull(tag);
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -103,7 +114,7 @@ public sealed class DeviceWorker : IAsyncDisposable
             throw new RungException($"设备 {_deviceOptions.DeviceId} 未连接，无法写入点位 {tag.Name}");
         }
 
-        var command = new WriteCommand(tag, value, new TaskCompletionSource<TagValue>(
+        var command = new WriteCommand(tag, value, caller, new TaskCompletionSource<TagValue>(
             TaskCreationOptions.RunContinuationsAsynchronously));
 
         if (!_writes.Writer.TryWrite(command))
@@ -257,7 +268,8 @@ public sealed class DeviceWorker : IAsyncDisposable
 
             // 写审计：产线上出了事，这条日志是唯一能还原"谁动了什么"的东西
             Log.TagWritten(
-                _logger, _deviceOptions.DeviceId, command.Tag.Name, command.Value, command.Tag.Address);
+                _logger, _deviceOptions.DeviceId, command.Tag.Name, command.Value,
+                command.Tag.Address, command.Caller);
 
             var actual = await ReadBackAsync(driver, command.Tag, cancellationToken).ConfigureAwait(false);
             command.Completion.TrySetResult(actual);
@@ -481,7 +493,8 @@ public sealed class DeviceWorker : IAsyncDisposable
         await TeardownAsync().ConfigureAwait(false);
     }
 
-    private sealed record WriteCommand(TagDef Tag, TagValue Value, TaskCompletionSource<TagValue> Completion);
+    private sealed record WriteCommand(
+        TagDef Tag, TagValue Value, string Caller, TaskCompletionSource<TagValue> Completion);
 
     private sealed class PollGroup(string name, TimeSpan interval, IReadOnlyList<TagDef> tags)
     {

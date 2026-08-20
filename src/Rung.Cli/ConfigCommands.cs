@@ -38,6 +38,7 @@ internal static class ConfigCommands
             "export" => await ExportAsync(args, store, output, cancellationToken).ConfigureAwait(false),
             "list" => await ListAsync(store, output, cancellationToken).ConfigureAwait(false),
             "check" => await CheckAsync(args, store, output, cancellationToken).ConfigureAwait(false),
+            "key" => await KeyAsync(args, store, output, cancellationToken).ConfigureAwait(false),
             _ => Usage(output),
         };
     }
@@ -198,6 +199,107 @@ internal static class ConfigCommands
         return check.ProblemCount == 0 ? 0 : 1;
     }
 
+    /// <summary>API 密钥管理。</summary>
+    private static async Task<int> KeyAsync(
+        string[] args, SqliteConfigStore store, TextWriter output, CancellationToken cancellationToken)
+    {
+        var action = args.Length > 2 ? args[2] : string.Empty;
+        var config = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var existing = config.Auth?.Keys.ToList() ?? [];
+
+        switch (action)
+        {
+            case "list":
+                if (existing.Count == 0)
+                {
+                    output.WriteLine("还没有任何 API 密钥。写接口目前是关闭的。");
+                    output.WriteLine("用 rung config key add <名称> --write 生成一个。");
+                    return 0;
+                }
+
+                foreach (var key in existing)
+                {
+                    output.WriteLine($"  {key.Name,-24} {(key.CanWrite ? "可读写" : "只读")}");
+                }
+
+                output.WriteLine();
+                output.WriteLine(
+                    config.Auth?.RequireForReads == true ? "读接口需要密钥。" : "读接口对内网放开。");
+
+                return 0;
+
+            case "add":
+                var name = args.Length > 3 ? args[3] : string.Empty;
+                if (string.IsNullOrWhiteSpace(name) || name.StartsWith("--", StringComparison.Ordinal))
+                {
+                    output.WriteLine("需要给密钥起个名字：rung config key add <名称> [--write]");
+                    return 1;
+                }
+
+                if (existing.Any(k => string.Equals(k.Name, name, StringComparison.Ordinal)))
+                {
+                    output.WriteLine($"密钥名 \"{name}\" 已存在。");
+                    return 1;
+                }
+
+                var canWrite = args.Contains("--write", StringComparer.Ordinal);
+                var (created, plaintext) = ApiKeys.Create(name, canWrite);
+
+                existing.Add(new ApiKeyConfig
+                {
+                    Name = created.Name, Hash = created.Hash, CanWrite = created.CanWrite,
+                });
+
+                await SaveAuthAsync(store, config, existing, cancellationToken).ConfigureAwait(false);
+
+                // 明文只在这一刻存在，库里只有哈希，之后再也拿不回来
+                output.WriteLine($"已生成密钥 \"{name}\"（{(canWrite ? "可读写" : "只读")}）：");
+                output.WriteLine();
+                output.WriteLine($"    {plaintext}");
+                output.WriteLine();
+                output.WriteLine("请立刻保存——它只显示这一次，库里存的是哈希，找不回来。");
+                output.WriteLine("调用时放进 X-Rung-Key 请求头。");
+
+                return 0;
+
+            case "remove":
+                var target = args.Length > 3 ? args[3] : string.Empty;
+                if (existing.RemoveAll(k => string.Equals(k.Name, target, StringComparison.Ordinal)) == 0)
+                {
+                    output.WriteLine($"没有名为 \"{target}\" 的密钥。");
+                    return 1;
+                }
+
+                await SaveAuthAsync(store, config, existing, cancellationToken).ConfigureAwait(false);
+                output.WriteLine($"已删除密钥 \"{target}\"。");
+
+                return 0;
+
+            default:
+                output.WriteLine("用法：");
+                output.WriteLine("  rung config key list --db <数据库>                    列出密钥");
+                output.WriteLine("  rung config key add <名称> [--write] --db <数据库>    生成密钥");
+                output.WriteLine("  rung config key remove <名称> --db <数据库>           删除密钥");
+
+                return 1;
+        }
+    }
+
+    private static async Task SaveAuthAsync(
+        SqliteConfigStore store,
+        RungConfig config,
+        List<ApiKeyConfig> keys,
+        CancellationToken cancellationToken)
+    {
+        var updated = config with
+        {
+            Auth = (config.Auth ?? new AuthConfig()) with { Keys = keys },
+        };
+
+        // 只改全局设置，设备按标识合并、原样保留
+        await store.ImportAsync(updated, replace: false, cancellationToken).ConfigureAwait(false);
+    }
+
     private static int Usage(TextWriter output)
     {
         output.WriteLine("""
@@ -208,6 +310,7 @@ internal static class ConfigCommands
               rung config list --db <数据库>                          列出设备
               rung config check --db <数据库>                         离线校验配置
               rung config check <文件.json|.xlsx> --db <数据库>       校验文件而不必先导入
+              rung config key list|add|remove --db <数据库>           管理 API 密钥
             """);
 
         return 1;

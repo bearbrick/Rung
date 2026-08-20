@@ -44,6 +44,9 @@ public sealed record RungConfig
     /// <summary>MQTT 北向输出。与 Redis 互不影响，可以同时开。</summary>
     public MqttConfig? Mqtt { get; init; }
 
+    /// <summary>接口认证。不配则等同于关闭——但写接口会被一并关掉，见 <see cref="AuthConfig"/>。</summary>
+    public AuthConfig? Auth { get; init; }
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         ReadCommentHandling = JsonCommentHandling.Skip,
@@ -180,6 +183,45 @@ public sealed record MqttConfig
 
     /// <summary>设备状态上报周期，秒。0 表示不上报。</summary>
     public int StatusIntervalSeconds { get; init; } = 10;
+}
+
+/// <summary>
+/// 接口认证配置。
+/// <para>
+/// 网关待在产线网里，是 IT/OT 边界上攻击面最靠前的一环。
+/// 写接口能让机器真的动起来，因此它<b>永远需要认证</b>——
+/// 没有配置任何密钥时，写接口直接关闭，而不是放开。
+/// </para>
+/// <para>
+/// 读接口默认放开：车间里的看板、报表、班组终端都要读数，
+/// 给每一个都发密钥在现实里推不动，而读数据的风险等级和写 PLC 完全不同。
+/// 需要严格管控时把 <see cref="RequireForReads"/> 打开。
+/// </para>
+/// </summary>
+public sealed record AuthConfig
+{
+    /// <summary>读接口是否也要求密钥。默认否。</summary>
+    public bool RequireForReads { get; init; }
+
+    /// <summary>密钥列表。只存哈希，明文在生成时给用户一次。</summary>
+    public IReadOnlyList<ApiKeyConfig> Keys { get; init; } = [];
+
+    /// <summary>转换成契约层的密钥模型。</summary>
+    public IReadOnlyList<ApiKey> ToApiKeys()
+        => [.. Keys.Select(static key => new ApiKey(key.Name, key.Hash, key.CanWrite))];
+}
+
+/// <summary>一个 API 密钥的配置形式。</summary>
+public sealed record ApiKeyConfig
+{
+    /// <summary>调用方名称，会出现在写命令的审计日志里。</summary>
+    public required string Name { get; init; }
+
+    /// <summary>密钥的 SHA-256，Base64。</summary>
+    public required string Hash { get; init; }
+
+    /// <summary>是否允许写点位。</summary>
+    public bool CanWrite { get; init; }
 }
 
 /// <summary>断线重连配置。</summary>

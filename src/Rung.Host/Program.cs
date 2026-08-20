@@ -59,6 +59,8 @@ async Task<int> RunGatewayAsync(WebApplicationBuilder builder, RungConfig rungCo
 {
 builder.Services.AddSingleton(rungConfig);
 builder.Services.AddSingleton(store);
+builder.Services.AddSingleton(new ApiKeyAuth(
+    rungConfig.Auth?.ToApiKeys() ?? [], rungConfig.Auth?.RequireForReads ?? false));
 builder.Services.AddSingleton<TagCache>();
 builder.Services.AddSingleton<TagChangeBroadcaster>();
 builder.Services.AddSingleton<IDeviceDriverFactory, S7DriverFactory>();

@@ -13,6 +13,7 @@
     <Project Path="src/Rung.Sinks.Redis/Rung.Sinks.Redis.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Rung.Abstractions.Tests/Rung.Abstractions.Tests.csproj" />
     <Project Path="tests/Rung.Configuration.Tests/Rung.Configuration.Tests.csproj" />
     <Project Path="tests/Rung.Core.Tests/Rung.Core.Tests.csproj" />
     <Project Path="tests/Rung.Drivers.Modbus.Tests/Rung.Drivers.Modbus.Tests.csproj" />

@@ -28,23 +28,27 @@ public static class ConfigEndpoints
         var api = app.MapGroup("/api/config").WithTags("Rung 配置");
 
         api.MapGet("/", GetSummary)
-            .WithSummary("当前配置摘要");
+            .WithSummary("当前配置摘要")
+            .RequireRead();
 
         api.MapGet("/export", ExportExcelAsync)
             .WithSummary("导出点位表为 Excel")
-            .WithDescription("导出的文件改完可以直接上传回来。");
+            .WithDescription("导出的文件改完可以直接上传回来。")
+            .RequireRead();
 
         api.MapPost("/validate", ValidateAsync)
             .WithSummary("只校验上传的配置，不写入")
             .WithDescription("上传 .xlsx 或 .json，逐行报出问题。不改变任何现有配置。")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .RequireRead();
 
         api.MapPost("/import", ImportAsync)
             .WithSummary("导入配置并立即生效")
             .WithDescription(
                 "上传 .xlsx 或 .json。先校验，有问题就整份拒绝；"
                 + "通过之后写入并在线重载，只有配置真的变了的设备会被重启。")
-            .DisableAntiforgery();
+            .DisableAntiforgery()
+            .RequireWrite();
 
         return app;
     }

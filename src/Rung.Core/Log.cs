@@ -49,9 +49,9 @@ internal static partial class Log
     /// 级别刻意定为 Information，确保默认配置下就会被记下来。
     /// </summary>
     [LoggerMessage(EventId = 2000, Level = LogLevel.Information,
-        Message = "写入 {DeviceId}/{TagName} = {Value}（地址 {Address}）")]
+        Message = "写入 {DeviceId}/{TagName} = {Value}（地址 {Address}，调用方 {Caller}）")]
     public static partial void TagWritten(
-        ILogger logger, string deviceId, string tagName, TagValue value, string address);
+        ILogger logger, string deviceId, string tagName, TagValue value, string address, string caller);
 
     [LoggerMessage(EventId = 2001, Level = LogLevel.Error,
         Message = "写入 {DeviceId}/{TagName} 失败")]
