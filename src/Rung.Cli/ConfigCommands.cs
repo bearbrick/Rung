@@ -3,6 +3,7 @@ using Rung.Configuration;
 using Rung.Abstractions;
 using Rung.Configuration.Storage;
 using Rung.Core;
+using Rung.Drivers.Melsec;
 using Rung.Drivers.Modbus;
 using Rung.Drivers.S7;
 
@@ -163,7 +164,8 @@ internal static class ConfigCommands
             output.WriteLine($"校验 {source}");
         }
 
-        IDeviceDriverFactory[] factories = [new S7DriverFactory(), new ModbusDriverFactory()];
+        IDeviceDriverFactory[] factories =
+            [new S7DriverFactory(), new ModbusDriverFactory(), new MelsecDriverFactory()];
         var registrations = config.ResolveDevices()
             .Select(device => new DeviceRegistration(
                 device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device)))

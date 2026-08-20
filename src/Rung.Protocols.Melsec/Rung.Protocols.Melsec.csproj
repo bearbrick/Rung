@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Rung.Protocols.Melsec</PackageId>
+    <Description>三菱 MELSEC 通信协议（MC 3E 帧）的纯编解码：地址解析、报文组包、响应解析。不含任何 IO。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

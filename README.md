@@ -123,6 +123,8 @@ src/
   Rung.Protocols.S7/       S7comm 纯编解码：地址解析、报文组包、响应解析、批量合并
   Rung.Drivers.S7/         S7 驱动：异步传输、握手、连接管理
   Rung.Drivers.Modbus/     Modbus TCP 驱动：地址语义、批量合并、多从站
+  Rung.Protocols.Melsec/   MELSEC MC 3E 纯编解码：地址解析、报文组包、批量合并
+  Rung.Drivers.Melsec/     三菱驱动：异步传输、读写执行
   Rung.Core/               采集内核：退避重连、分组调度、点位缓存、写队列、多设备编排
   Rung.Sinks.Redis/        Redis 北向输出
   Rung.Sinks.Mqtt/         MQTT 北向输出（保留消息 + 遗嘱消息）
@@ -189,6 +191,17 @@ Web 界面上的 `点位/请求` 一栏就是这个效果的直接体现。
 
 支持德文助记符（`E`/`A`/`Z`）和 S7-200 的 V 区。S7-300/400 填 rack 0 / slot 2，
 S7-1200/1500 通常是 rack 0 / slot 1。
+
+### 三菱 MELSEC（MC 3E over TCP）
+
+`D100` `M200` `R500` `TN10`（**十进制**编号）· `X1F` `Y2A` `B100` `W1A0` `ZR3000`（**十六进制**编号）
+
+两个坑，都不会报错，只会读出一个"看着像那么回事"的数：
+
+1. **X / Y / B / W / ZR 的编号是十六进制。** 地址表上写 `X10` 指的是第 16 点不是第 10 点。
+   按十进制读会读到隔壁的点。
+2. **32 位值低字在前。** 一个 Float32 占 D(n) 和 D(n+1)，D(n) 是低 16 位，
+   因此这类点位的字节序通常要配成 `DCBA`。
 
 ### Modbus TCP
 
@@ -455,7 +468,8 @@ cd web && npm run lint
 - [x] 配置在线重载（Web 编辑的地基）
 - [x] Web 配置管理：Excel 下载 / 上传 / 校验 / 一键生效
 - [ ] 真机验证与报文夹具替换
-- [ ] Modbus RTU（串口）、三菱 MC、欧姆龙 FINS
+- [x] 三菱 MELSEC（MC 3E over TCP）
+- [ ] Modbus RTU（串口）、欧姆龙 FINS
 - [x] MQTT 输出
 
 ---

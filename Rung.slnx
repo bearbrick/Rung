@@ -4,9 +4,11 @@
     <Project Path="src/Rung.Cli/Rung.Cli.csproj" />
     <Project Path="src/Rung.Configuration/Rung.Configuration.csproj" />
     <Project Path="src/Rung.Core/Rung.Core.csproj" />
+    <Project Path="src/Rung.Drivers.Melsec/Rung.Drivers.Melsec.csproj" />
     <Project Path="src/Rung.Drivers.Modbus/Rung.Drivers.Modbus.csproj" />
     <Project Path="src/Rung.Drivers.S7/Rung.Drivers.S7.csproj" />
     <Project Path="src/Rung.Host/Rung.Host.csproj" />
+    <Project Path="src/Rung.Protocols.Melsec/Rung.Protocols.Melsec.csproj" />
     <Project Path="src/Rung.Protocols.S7/Rung.Protocols.S7.csproj" />
     <Project Path="src/Rung.Simulator/Rung.Simulator.csproj" />
     <Project Path="src/Rung.Sinks.Mqtt/Rung.Sinks.Mqtt.csproj" />
@@ -16,6 +18,7 @@
     <Project Path="tests/Rung.Abstractions.Tests/Rung.Abstractions.Tests.csproj" />
     <Project Path="tests/Rung.Configuration.Tests/Rung.Configuration.Tests.csproj" />
     <Project Path="tests/Rung.Core.Tests/Rung.Core.Tests.csproj" />
+    <Project Path="tests/Rung.Drivers.Melsec.Tests/Rung.Drivers.Melsec.Tests.csproj" />
     <Project Path="tests/Rung.Drivers.Modbus.Tests/Rung.Drivers.Modbus.Tests.csproj" />
     <Project Path="tests/Rung.Drivers.S7.Tests/Rung.Drivers.S7.Tests.csproj" />
     <Project Path="tests/Rung.Host.Tests/Rung.Host.Tests.csproj" />

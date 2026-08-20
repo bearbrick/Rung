@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Rung.Drivers.Melsec</PackageId>
+    <Description>三菱 MELSEC 驱动（MC 3E over TCP）：异步传输、连接管理、读写执行。</Description>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Rung.Abstractions\Rung.Abstractions.csproj" />
+    <ProjectReference Include="..\Rung.Protocols.Melsec\Rung.Protocols.Melsec.csproj" />
+  </ItemGroup>
+</Project>

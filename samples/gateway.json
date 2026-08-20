@@ -69,6 +69,24 @@
       ]
     },
     {
+      "deviceId": "line3-injection",
+      "protocol": "melsec-mc",
+      "host": "127.0.0.1",
+      "port": 16000,
+      "tags": [
+        { "name": "Line3.Inj.Temp", "address": "D100", "dataType": "Int16",
+          "byteOrder": "DCBA", "scale": 0.1, "deadband": 0.5, "description": "料筒温度 ℃" },
+        { "name": "Line3.Inj.Shots", "address": "D200", "dataType": "Int32",
+          "byteOrder": "DCBA", "description": "模次计数" },
+        { "name": "Line3.Inj.Pressure", "address": "D300", "dataType": "Float32",
+          "byteOrder": "DCBA", "deadband": 0.5, "description": "注射压力 MPa" },
+        { "name": "Line3.Inj.Clamped", "address": "M100", "dataType": "Bool",
+          "description": "合模到位" },
+        { "name": "Line3.Inj.SafetyDoor", "address": "X1F", "dataType": "Bool",
+          "description": "安全门信号" }
+      ]
+    },
+    {
       "deviceId": "line2-flaky",
       "protocol": "s7",
       "host": "127.0.0.1",

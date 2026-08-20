@@ -4,6 +4,7 @@ using Rung.Abstractions;
 using Rung.Configuration;
 using Rung.Configuration.Storage;
 using Rung.Core;
+using Rung.Drivers.Melsec;
 using Rung.Drivers.Modbus;
 using Rung.Drivers.S7;
 using Rung.Sinks.Redis;
@@ -127,7 +128,9 @@ public static class Program
         }
 
         await using var redisScope = redis;
-        await using var host = new GatewayHost([new S7DriverFactory(), new ModbusDriverFactory()], cache, sinks, loggerFactory);
+        await using var host = new GatewayHost(
+            [new S7DriverFactory(), new ModbusDriverFactory(), new MelsecDriverFactory()],
+            cache, sinks, loggerFactory);
 
         foreach (var device in devices)
         {

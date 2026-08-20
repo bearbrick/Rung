@@ -108,5 +108,38 @@
         }
       ]
     }
+  ],
+  "melsecDevices": [
+    {
+      "name": "line3-injection",
+      "port": 16000,
+      "signals": [
+        {
+          "address": "D100", "type": "Int16",
+          "generator": "sine", "min": 1800, "max": 2200, "periodSeconds": 30,
+          "description": "料筒温度，放大 10 倍"
+        },
+        {
+          "address": "D200", "type": "Int32",
+          "generator": "counter", "value": 88000, "step": 1, "periodSeconds": 4,
+          "description": "模次计数"
+        },
+        {
+          "address": "D300", "type": "Float32",
+          "generator": "randomwalk", "min": 120, "max": 145, "step": 0.8, "periodSeconds": 1,
+          "description": "注射压力 MPa"
+        },
+        {
+          "address": "M100", "type": "Int16",
+          "generator": "toggle", "periodSeconds": 9,
+          "description": "合模到位"
+        },
+        {
+          "address": "X1F", "type": "Int16",
+          "generator": "toggle", "periodSeconds": 6,
+          "description": "安全门信号（注意 X 是十六进制编号）"
+        }
+      ]
+    }
   ]
 }

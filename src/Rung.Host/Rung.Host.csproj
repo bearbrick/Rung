@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rung.Configuration\Rung.Configuration.csproj" />
     <ProjectReference Include="..\Rung.Core\Rung.Core.csproj" />
+    <ProjectReference Include="..\Rung.Drivers.Melsec\Rung.Drivers.Melsec.csproj" />
     <ProjectReference Include="..\Rung.Drivers.Modbus\Rung.Drivers.Modbus.csproj" />
     <ProjectReference Include="..\Rung.Drivers.S7\Rung.Drivers.S7.csproj" />
     <ProjectReference Include="..\Rung.Sinks.Mqtt\Rung.Sinks.Mqtt.csproj" />
