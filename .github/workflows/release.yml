@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+
+jobs:
+  artifacts:
+    name: 发布包 ${{ matrix.rid }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    strategy:
+      matrix:
+        # linux-arm64 覆盖树莓派和边缘盒子，产线侧用得不少
+        rid: [linux-x64, linux-arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 打包
+        run: ./scripts/publish.sh ${{ matrix.rid }}
+
+      - name: 压缩
+        run: tar -czf rung-${{ matrix.rid }}.tar.gz -C artifacts rung-${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rung-${{ matrix.rid }}
+          path: rung-${{ matrix.rid }}.tar.gz
+          retention-days: 30

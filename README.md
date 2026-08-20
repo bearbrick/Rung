@@ -1,5 +1,7 @@
 # Rung
 
+[![CI](https://github.com/bearbrick/Rung/actions/workflows/ci.yml/badge.svg)](https://github.com/bearbrick/Rung/actions/workflows/ci.yml)
+
 轻量级 PLC 数据采集网关 · A lightweight PLC data acquisition gateway for .NET
 
 把西门子 S7、Modbus TCP 设备的点位配置好，采集到的数据通过 REST、SSE、Redis

@@ -51,6 +51,11 @@ public sealed class GatewayFixture : IAsyncLifetime
                 },
                 new SignalConfig { Address = "DB1.DBX4.0", Type = "Bool", Generator = "toggle", PeriodSeconds = 1 },
                 new SignalConfig { Address = "DB1.DBW10", Type = "Int16", Generator = "constant", Value = 2400 },
+
+                // 专供只读断言：没有任何用例会写它。
+                // 拿可写点位去断言固定值，会让测试依赖执行顺序——
+                // Debug 下碰巧先跑读所以通过，Release 下顺序一变就红
+                new SignalConfig { Address = "DB1.DBW12", Type = "Int16", Generator = "constant", Value = 1234 },
             ],
         });
 
@@ -75,7 +80,9 @@ public sealed class GatewayFixture : IAsyncLifetime
                     { "name": "Line1.Oven.Count", "address": "DB1.DBW0", "dataType": "Int16" },
                     { "name": "Line1.Oven.Running", "address": "DB1.DBX4.0", "dataType": "Bool" },
                     { "name": "Line1.Oven.Setpoint", "address": "DB1.DBW10", "dataType": "Int16",
-                      "scale": 0.1, "access": "ReadWrite" }
+                      "scale": 0.1, "access": "ReadWrite" },
+                    { "name": "Line1.Oven.Scaled", "address": "DB1.DBW12", "dataType": "Int16",
+                      "scale": 0.1 }
                   ]
                 }
               ]

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 同一分支上新推送会取消还在跑的旧任务，省 runner 也省等待
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+
+jobs:
+  backend:
+    name: 后端构建与测试
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 缓存 NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # 单独一步跑还原：依赖有安全公告时 NuGet 审计会在这里失败，
+      # 与编译错误分开更容易看出是哪类问题
+      - name: 还原（含依赖安全审计）
+        run: dotnet restore
+
+      # Directory.Build.props 里 TreatWarningsAsErrors 是开的，
+      # 因此这一步同时也是代码风格与分析器的门禁
+      - name: 构建
+        run: dotnet build --no-restore -c Release
+
+      - name: 测试
+        run: dotnet test --no-build -c Release
+
+  frontend:
+    name: 前端类型检查与构建
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      # 类型检查会捕捉前后端契约漂移：后端改了 DTO 而 openapi.json
+      # 没重新生成时，这一步当场变红
+      - name: 类型检查
+        run: npm run lint
+
+      - name: 构建
+        run: npm run build
+
+  package:
+    name: 打包验证
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # 交付形态本身也要有门禁：能编译不等于能发布出去
+      - name: 单文件自包含发布
+        run: ./scripts/publish.sh linux-x64
+
+      - name: 检查发布产物
+        run: |
+          test -x artifacts/rung-linux-x64/rung-host
+          test -f artifacts/rung-linux-x64/wwwroot/index.html
+          test -f artifacts/rung-linux-x64/rung.service
+          du -sh artifacts/rung-linux-x64
+
+      - name: 构建容器镜像
+        run: docker build -t rung:ci .

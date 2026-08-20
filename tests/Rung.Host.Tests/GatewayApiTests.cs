@@ -23,7 +23,7 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
         Assert.Equal("healthy", health.Status);
         Assert.Equal(1, health.DeviceCount);
         Assert.Equal(1, health.ConnectedCount);
-        Assert.Equal(3, health.TagCount);
+        Assert.Equal(4, health.TagCount);
         Assert.Equal(0, health.IssueCount);
 
         // 启动时刻若用静态只读字段，beforefieldinit 会把它推迟到首次读取，
@@ -42,7 +42,7 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
         Assert.Equal("oven", device.DeviceId);
         Assert.Equal("Connected", device.State);
         Assert.Equal(240, device.NegotiatedPduLength);
-        Assert.Equal(3, device.ActiveTagCount);
+        Assert.Equal(4, device.ActiveTagCount);
         Assert.NotNull(device.LastSuccessUtc);
         Assert.Empty(device.Issues);
     }
@@ -62,22 +62,24 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
         var tags = await _fixture.Client.GetFromJsonAsync<List<TagView>>(
             "/api/tags", TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, tags!.Count);
+        Assert.Equal(4, tags!.Count);
 
         var setpoint = Assert.Single(tags, t => t.Name == "Line1.Oven.Setpoint");
         Assert.Equal("Good", setpoint.Quality);
         Assert.Equal("oven", setpoint.DeviceId);
         Assert.Equal("DB1.DBW10", setpoint.Address);
 
-        // 配了 scale 0.1，2400 应当呈现为 240 的工程值
-        Assert.Equal(240d, ((JsonElement)setpoint.Value!).GetDouble());
+        // 倍率断言用一个没人写的只读点位：拿可写点位断言固定值
+        // 会让这个用例依赖执行顺序，Release 下顺序一变就红
+        var scaled = Assert.Single(tags, t => t.Name == "Line1.Oven.Scaled");
+        Assert.Equal(123.4d, ((JsonElement)scaled.Value!).GetDouble(), precision: 6);
     }
 
     [Fact]
     public async Task 按前缀过滤点位()
     {
         var all = await _fixture.Client.GetFromJsonAsync<List<TagView>>(
-            "/api/tags?prefix=Line1.Oven.S", TestContext.Current.CancellationToken);
+            "/api/tags?prefix=Line1.Oven.Set", TestContext.Current.CancellationToken);
 
         Assert.Equal("Line1.Oven.Setpoint", Assert.Single(all!).Name);
     }
@@ -90,7 +92,7 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
         var others = await _fixture.Client.GetFromJsonAsync<List<TagView>>(
             "/api/tags?device=nobody", TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, mine!.Count);
+        Assert.Equal(4, mine!.Count);
         Assert.Empty(others!);
     }
 
@@ -230,7 +232,7 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
         Assert.Contains("rung_device_up{device=\"oven\"} 1", text, StringComparison.Ordinal);
-        Assert.Contains("rung_tags_total 3", text, StringComparison.Ordinal);
+        Assert.Contains("rung_tags_total 4", text, StringComparison.Ordinal);
     }
 
     [Fact]
