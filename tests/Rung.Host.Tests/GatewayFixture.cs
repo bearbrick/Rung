@@ -35,6 +35,10 @@ public sealed class GatewayFixture : IAsyncLifetime
     /// <summary>夹具使用的可写密钥明文。</summary>
     public string WriteKey { get; } = ApiKeys.Generate();
 
+    /// <summary>审计文件目录。</summary>
+    public string AuditDirectory { get; } =
+        Path.Combine(Path.GetTempPath(), $"rung-host-audit-{Guid.NewGuid():N}");
+
     public async ValueTask InitializeAsync()
     {
         Plc = new S7SimulatorServer(new SimulatedDeviceConfig
@@ -64,6 +68,11 @@ public sealed class GatewayFixture : IAsyncLifetime
             {
               "version": 1,
               "pollIntervalMs": 100,
+              "audit": {
+                "enabled": true,
+                "directory": "{{AuditDirectory.Replace("\\", "/", StringComparison.Ordinal)}}",
+                "retentionDays": 1
+              },
               "auth": {
                 "keys": [
                   { "name": "test-writer", "hash": "{{ApiKeys.ComputeHash(WriteKey)}}", "canWrite": true }
@@ -132,6 +141,11 @@ public sealed class GatewayFixture : IAsyncLifetime
         if (File.Exists(_configPath))
         {
             File.Delete(_configPath);
+        }
+
+        if (Directory.Exists(AuditDirectory))
+        {
+            Directory.Delete(AuditDirectory, recursive: true);
         }
     }
 }

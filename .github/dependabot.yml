@@ -1,0 +1,32 @@
+# 依赖更新。Rung 的依赖不多，但其中几个是安全敏感的
+# （StackExchange.Redis、MQTTnet、EF Core、AspNetCore.OpenApi）——
+# Microsoft.OpenApi 那次高危漏洞就是靠 NuGet 审计发现的，
+# 有 dependabot 就不必等到某次构建才知道。
+version: 2
+
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # 微软那套版本号是齐步走的，拆成十几个 PR 只会没人看
+      microsoft:
+        patterns: ['Microsoft.*', 'System.*']
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns: ['react', 'react-dom', '@types/react*']
+      build:
+        patterns: ['vite', '@vitejs/*', 'typescript']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

@@ -76,10 +76,26 @@ async function postFile<T>(path: string, file: File): Promise<T> {
   return (await response.json()) as T;
 }
 
+export interface AuditRecord {
+  timestampUtc: string;
+  caller: string;
+  deviceId: string;
+  tagName: string;
+  address: string;
+  dataType: string;
+  requested: string;
+  actual?: string | null;
+  success: boolean;
+  error?: string | null;
+}
+
 export const api = {
   health: (signal?: AbortSignal) => getJson<HealthView>('/api/health', signal),
   devices: (signal?: AbortSignal) => getJson<DeviceView[]>('/api/devices', signal),
   tags: (signal?: AbortSignal) => getJson<TagView[]>('/api/tags', signal),
+
+  audit: (limit: number, signal?: AbortSignal) =>
+    getJson<AuditRecord[]>(`/api/audit?limit=${limit}`, signal),
 
   config: (signal?: AbortSignal) => getJson<ConfigSummary>('/api/config', signal),
 

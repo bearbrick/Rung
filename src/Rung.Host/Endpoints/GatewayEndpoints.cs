@@ -114,6 +114,28 @@ public static class GatewayEndpoints
             .ReadRecentAsync(Math.Clamp(limit, 1, 1000), cancellationToken)
             .ConfigureAwait(false));
 
+    /// <summary>记一条被拒绝的写尝试。</summary>
+    private static ValueTask AuditRejectionAsync(
+        IWriteAuditLog audit,
+        string caller,
+        string deviceId,
+        string tagName,
+        WriteTagRequest request,
+        string reason,
+        CancellationToken cancellationToken,
+        TagDef? tag = null)
+        => audit.RecordAsync(new WriteAuditRecord(
+            DateTime.UtcNow,
+            caller,
+            deviceId,
+            tagName,
+            tag?.Address ?? string.Empty,
+            tag?.DataType.ToString() ?? string.Empty,
+            request.Value.ToString(),
+            null,
+            Success: false,
+            reason), cancellationToken);
+
     private static ContentHttpResult GetMetrics(GatewayHost gateway)
         => TypedResults.Text(
             PrometheusFormatter.Render(gateway.DeviceStatuses, gateway.Cache, DateTime.UtcNow),
@@ -169,17 +191,30 @@ public static class GatewayEndpoints
     private static async Task<Results<Ok<TagView>, NotFound<string>, BadRequest<string>>> WriteTag(
         GatewayHost gateway,
         HttpContext context,
+        IWriteAuditLog audit,
         string tagName,
         WriteTagRequest request,
         CancellationToken cancellationToken)
     {
+        var caller = context.GetCaller().Name;
+
+        // 被拒绝的尝试同样留痕。「谁试图往一个只读点位写东西」是安全审计里
+        // 最该看到的信号之一，只记成功的等于把它整个丢掉
         if (!gateway.TryGetTag(tagName, out var tag))
         {
+            await AuditRejectionAsync(
+                audit, caller, "unknown", tagName, request,
+                $"未知的点位 \"{tagName}\"", cancellationToken).ConfigureAwait(false);
+
             return TypedResults.NotFound($"未知的点位 \"{tagName}\"");
         }
 
         if (tag.Access == TagAccess.Read)
         {
+            await AuditRejectionAsync(
+                audit, caller, gateway.DeviceIdOf(tagName), tagName, request,
+                "点位是只读的", cancellationToken, tag).ConfigureAwait(false);
+
             return TypedResults.BadRequest($"点位 \"{tagName}\" 是只读的");
         }
 
@@ -188,11 +223,19 @@ public static class GatewayEndpoints
         {
             var value = TagValueConverter.FromJson(request.Value, tag, DateTime.UtcNow);
             actual = await gateway
-                .WriteAsync(tagName, value, cancellationToken, context.GetCaller().Name)
+                .WriteAsync(tagName, value, cancellationToken, caller)
                 .ConfigureAwait(false);
         }
         catch (RungException ex)
         {
+            // 只有值转换失败要在这里补记；写到设备那一步失败由 DeviceWorker 自己记
+            if (ex.Message.StartsWith("无法把", StringComparison.Ordinal))
+            {
+                await AuditRejectionAsync(
+                    audit, caller, gateway.DeviceIdOf(tagName), tagName, request,
+                    ex.Message, cancellationToken, tag).ConfigureAwait(false);
+            }
+
             return TypedResults.BadRequest(ex.Message);
         }
 

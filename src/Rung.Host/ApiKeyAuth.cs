@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Rung.Abstractions;
+using Rung.Core;
 
 namespace Rung.Host;
 
@@ -101,6 +101,21 @@ public static class ApiKeyAuthExtensions
 
             if (!caller.CanWrite)
             {
+                // 未授权的写尝试是安全审计里最该看到的信号
+                var audit = context.HttpContext.RequestServices.GetRequiredService<IWriteAuditLog>();
+                await audit.RecordAsync(new WriteAuditRecord(
+                    DateTime.UtcNow,
+                    caller.Name,
+                    "unknown",
+                    context.HttpContext.Request.Path.Value ?? string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    null,
+                    Success: false,
+                    "未授权：密钥缺失或不具备写权限"), context.HttpContext.RequestAborted)
+                    .ConfigureAwait(false);
+
                 return TypedResults.Problem(
                     $"需要具备写权限的 API 密钥。请在 {ApiKeyAuth.HeaderName} 头里提供。",
                     statusCode: StatusCodes.Status401Unauthorized);

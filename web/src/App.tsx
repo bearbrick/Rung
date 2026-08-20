@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from './api/client';
 import type { TagView } from './api/types';
+import { AuditTable } from './components/AuditTable';
 import { ConfigPanel } from './components/ConfigPanel';
 import { DeviceTable } from './components/DeviceTable';
 import { HealthBar } from './components/HealthBar';
@@ -72,6 +73,11 @@ function Dashboard() {
                 children: (
                   <DeviceTable devices={devices.data ?? []} loading={devices.isLoading} />
                 ),
+              },
+              {
+                key: 'audit',
+                label: '写审计',
+                children: <AuditTable />,
               },
               {
                 key: 'config',

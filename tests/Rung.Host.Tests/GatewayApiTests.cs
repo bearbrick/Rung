@@ -224,6 +224,42 @@ public class GatewayApiTests : IClassFixture<GatewayFixture>
     }
 
     [Fact]
+    public async Task 被拒绝的写尝试也进审计()
+    {
+        // 「谁试图往一个只读点位写东西」是安全审计里最该看到的信号之一，
+        // 只记成功的等于把它整个丢掉
+        await _fixture.Client.PostAsJsonAsync(
+            "/api/tags/Line1.Oven.Count/write", new { value = 1 },
+            TestContext.Current.CancellationToken);
+
+        var records = await _fixture.Client.GetFromJsonAsync<List<AuditRecordView>>(
+            "/api/audit?limit=50", TestContext.Current.CancellationToken);
+
+        Assert.Contains(records!, r =>
+            r.TagName == "Line1.Oven.Count" && !r.Success && r.Error!.Contains("只读", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task 未授权的写尝试也进审计()
+    {
+        await _fixture.Anonymous.PostAsJsonAsync(
+            "/api/tags/Line1.Oven.Setpoint/write", new { value = 1 },
+            TestContext.Current.CancellationToken);
+
+        var records = await _fixture.Client.GetFromJsonAsync<List<AuditRecordView>>(
+            "/api/audit?limit=50", TestContext.Current.CancellationToken);
+
+        Assert.Contains(records!, r =>
+            !r.Success && r.Error!.Contains("未授权", StringComparison.Ordinal));
+    }
+
+    /// <summary>审计记录的对外形状。这里单独声明一份，是为了让接口契约被测试盯住。</summary>
+    public sealed record AuditRecordView(
+        DateTime TimestampUtc, string Caller, string DeviceId, string TagName,
+        string Address, string DataType, string Requested, string? Actual,
+        bool Success, string? Error);
+
+    [Fact]
     public async Task 提供Prometheus指标()
     {
         var response = await _fixture.Client.GetAsync("/metrics", TestContext.Current.CancellationToken);
