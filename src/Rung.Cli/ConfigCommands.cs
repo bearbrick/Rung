@@ -1,6 +1,10 @@
 using System.Globalization;
 using Rung.Configuration;
+using Rung.Abstractions;
 using Rung.Configuration.Storage;
+using Rung.Core;
+using Rung.Drivers.Modbus;
+using Rung.Drivers.S7;
 
 namespace Rung.Cli;
 
@@ -50,8 +54,9 @@ internal static class ConfigCommands
         }
 
         RungConfig config;
+        var fromExcel = source.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase);
 
-        if (source.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        if (fromExcel)
         {
             config = TagExcel.Import(source, out var issues);
 
@@ -74,7 +79,10 @@ internal static class ConfigCommands
 
         // 默认整表替换：点位表是一份份交付的，合并会让"这次交付改了什么"说不清
         var merge = args.Contains("--merge", StringComparer.Ordinal);
-        var result = await store.ImportAsync(config, replace: !merge, cancellationToken)
+        // Excel 不含全局设置，照单全收会把采集组周期、重连参数、
+        // Redis / MQTT 配置静默清空
+        var result = await store.ImportAsync(
+            config, replace: !merge, cancellationToken, includeGlobalSettings: !fromExcel)
             .ConfigureAwait(false);
 
         output.WriteLine(string.Create(CultureInfo.InvariantCulture,
@@ -154,20 +162,20 @@ internal static class ConfigCommands
             output.WriteLine($"校验 {source}");
         }
 
-        var results = ConfigChecker.Check(config);
-        var duplicates = ConfigChecker.FindDuplicateTagNames(config);
-        var problems = results.Sum(static r => r.Issues.Count) + duplicates.Count;
+        IDeviceDriverFactory[] factories = [new S7DriverFactory(), new ModbusDriverFactory()];
+        var registrations = config.ResolveDevices()
+            .Select(device => new DeviceRegistration(
+                device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device)))
+            .ToList();
+
+        var check = ConfigChecker.Check(factories, registrations);
 
         output.WriteLine();
-        foreach (var result in results)
+        foreach (var result in check.Devices)
         {
-            var efficiency = result.FetchedBytes > 0
-                ? string.Create(CultureInfo.InvariantCulture, $"，每轮取回 {result.FetchedBytes} 字节")
-                : string.Empty;
-
             output.WriteLine(string.Create(CultureInfo.InvariantCulture,
                 $"  {result.DeviceId,-18} {result.Protocol,-12} "
-                + $"{result.TagCount,4} 个点位 → 每轮 {result.RequestCount} 次请求{efficiency}"));
+                + $"{result.TagCount,4} 个点位 → 每轮 {result.RequestCount} 次请求"));
 
             foreach (var issue in result.Issues)
             {
@@ -175,19 +183,19 @@ internal static class ConfigCommands
             }
         }
 
-        foreach (var duplicate in duplicates)
+        foreach (var duplicate in check.DuplicateTagNames)
         {
             // 跨设备重名会让写命令落到错误的设备上，是代价最大的一类配置错误
             output.WriteLine($"  ! 点位名重复：{duplicate}");
         }
 
         output.WriteLine();
-        output.WriteLine(problems == 0
-            ? $"未发现问题。共 {results.Count} 台设备，{results.Sum(static r => r.TagCount)} 个点位，"
-                + $"每轮 {results.Sum(static r => r.RequestCount)} 次请求。"
-            : $"发现 {problems} 个问题。请求次数按 PDU 240 的最保守假设估算，真机只会更少。");
+        output.WriteLine(check.ProblemCount == 0
+            ? $"未发现问题。共 {check.Devices.Count} 台设备，{check.TagCount} 个点位，"
+                + $"每轮 {check.RequestCount} 次请求。"
+            : $"发现 {check.ProblemCount} 个问题。请求次数按最保守的协商假设估算，真机只会更少。");
 
-        return problems == 0 ? 0 : 1;
+        return check.ProblemCount == 0 ? 0 : 1;
     }
 
     private static int Usage(TextWriter output)

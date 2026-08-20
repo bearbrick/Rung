@@ -186,6 +186,9 @@ internal sealed class MultiDeviceFakeFactory : IDeviceDriverFactory
     }
 
     public IDeviceDriver Create(DeviceOptions options) => this[options.DeviceId];
+
+    public IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags)
+        => this[options.DeviceId].CreateReadPlan(tags);
 }
 
 /// <summary>始终交出同一个假驱动实例，方便测试跨重连观察它的状态。</summary>
@@ -196,4 +199,7 @@ internal sealed class FakeDriverFactory(FakeDriver driver) : IDeviceDriverFactor
     public string AddressSyntaxHint => "任意字符串";
 
     public IDeviceDriver Create(DeviceOptions options) => driver;
+
+    public IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags)
+        => driver.CreateReadPlan(tags);
 }

@@ -1,5 +1,6 @@
 using Rung.Abstractions;
-using Rung.Cli;
+using Rung.Core;
+using Rung.Drivers.Modbus;
 using Rung.Configuration;
 using Xunit;
 
@@ -16,6 +17,13 @@ public class ConfigCheckerTests
 
     private static RungConfig Config(params DeviceConfig[] devices) => new() { Devices = devices };
 
+    private static readonly IDeviceDriverFactory[] Factories =
+        [new S7DriverFactory(), new ModbusDriverFactory()];
+
+    private static IReadOnlyList<DeviceRegistration> Registrations(RungConfig config)
+        => [.. config.ResolveDevices().Select(device => new DeviceRegistration(
+            device.ToDeviceOptions(), device.ToTagDefs(), config.ToWorkerOptions(device)))];
+
     private static DeviceConfig Device(string id, string protocol, params TagConfig[] tags) => new()
     {
         DeviceId = id,
@@ -30,12 +38,11 @@ public class ConfigCheckerTests
         var config = Config(Device("oven", "s7",
             Tag("A", "DB1.DBW0"), Tag("B", "DB1.DBW2"), Tag("C", "DB1.DBW4")));
 
-        var result = Assert.Single(ConfigChecker.Check(config));
+        var result = Assert.Single(ConfigChecker.Check(Factories, Registrations(config)).Devices);
 
         Assert.Empty(result.Issues);
         Assert.Equal(3, result.TagCount);
         Assert.Equal(1, result.RequestCount);   // 连续地址合并成一次
-        Assert.Equal(6, result.FetchedBytes);
     }
 
     [Fact]
@@ -43,7 +50,7 @@ public class ConfigCheckerTests
     {
         var config = Config(Device("oven", "s7", Tag("bad", "DB0.DBW0")));
 
-        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(config)).Issues);
+        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(Factories, Registrations(config)).Devices).Issues);
 
         Assert.Equal("bad", issue.TagName);
         Assert.Contains("不能为 0", issue.Reason, StringComparison.Ordinal);
@@ -55,7 +62,7 @@ public class ConfigCheckerTests
         // 这个错在现场表现为"读回一个乱码"，且因为长度对得上很难想到是配置问题
         var config = Config(Device("oven", "s7", Tag("bad", "DB1.DBW4", TagDataType.Float32)));
 
-        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(config)).Issues);
+        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(Factories, Registrations(config)).Devices).Issues);
 
         Assert.Contains("2 字节", issue.Reason, StringComparison.Ordinal);
         Assert.Contains("4 字节", issue.Reason, StringComparison.Ordinal);
@@ -67,7 +74,7 @@ public class ConfigCheckerTests
         var config = Config(Device("meter", "modbus-tcp",
             Tag("ok", "HR0"), Tag("bad", "CO0", TagDataType.Int16)));
 
-        var result = Assert.Single(ConfigChecker.Check(config));
+        var result = Assert.Single(ConfigChecker.Check(Factories, Registrations(config)).Devices);
 
         Assert.Contains("只能配 Bool", Assert.Single(result.Issues).Reason, StringComparison.Ordinal);
     }
@@ -77,7 +84,7 @@ public class ConfigCheckerTests
     {
         var config = Config(Device("x", "profinet", Tag("A", "DB1.DBW0")));
 
-        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(config)).Issues);
+        var issue = Assert.Single(Assert.Single(ConfigChecker.Check(Factories, Registrations(config)).Devices).Issues);
 
         Assert.Contains("profinet", issue.Reason, StringComparison.Ordinal);
         Assert.Contains("modbus-tcp", issue.Reason, StringComparison.Ordinal);
@@ -92,7 +99,7 @@ public class ConfigCheckerTests
             Device("a", "s7", Tag("Shared", "DB1.DBW0")),
             Device("b", "s7", Tag("Shared", "DB1.DBW2")));
 
-        var duplicate = Assert.Single(ConfigChecker.FindDuplicateTagNames(config));
+        var duplicate = Assert.Single(ConfigChecker.FindDuplicateTagNames(Registrations(config)));
 
         Assert.Contains("Shared", duplicate, StringComparison.Ordinal);
         Assert.Contains("a", duplicate, StringComparison.Ordinal);
@@ -106,7 +113,7 @@ public class ConfigCheckerTests
             Device("a", "s7", Tag("Shared", "DB1.DBW0")),
             Device("b", "s7", Tag("Shared", "DB1.DBW2") with { Enabled = false }));
 
-        Assert.Empty(ConfigChecker.FindDuplicateTagNames(config));
+        Assert.Empty(ConfigChecker.FindDuplicateTagNames(Registrations(config)));
     }
 
     [Fact]
@@ -118,7 +125,7 @@ public class ConfigCheckerTests
             .Select(i => Tag($"t{i}", $"DB1.DBW{i * 2}"))
             .ToArray();
 
-        var result = Assert.Single(ConfigChecker.Check(Config(Device("oven", "s7", tags))));
+        var result = Assert.Single(ConfigChecker.Check(Factories, Registrations(Config(Device("oven", "s7", tags)))).Devices);
 
         Assert.Equal(2, result.RequestCount);
         Assert.Empty(result.Issues);

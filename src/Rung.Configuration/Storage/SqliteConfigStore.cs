@@ -53,10 +53,19 @@ public sealed class SqliteConfigStore(string databasePath) : IConfigStore
     /// <param name="config">来源配置，可以来自 JSON 文件或 Excel。</param>
     /// <param name="replace">true 表示先清空再写入；false 表示按设备标识合并。</param>
     /// <param name="cancellationToken">取消信号。</param>
+    /// <param name="includeGlobalSettings">
+    /// 是否连同全局设置（采集周期、重连参数、Redis / MQTT 配置）一起写入。
+    /// <para>
+    /// <b>从 Excel 导入时必须传 false。</b>点位表只承载设备和点位，
+    /// 不含这些全局设置——照单全收会把它们静默清空，
+    /// 表现为"改了个点位名，结果 Redis 输出没了、采集周期变回默认值"。
+    /// </para>
+    /// </param>
     public async Task<ImportResult> ImportAsync(
         RungConfig config,
         bool replace,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeGlobalSettings = true)
     {
         ArgumentNullException.ThrowIfNull(config);
 
@@ -106,7 +115,10 @@ public sealed class SqliteConfigStore(string databasePath) : IConfigStore
             updated++;
         }
 
-        await SaveGlobalAsync(context, config, cancellationToken).ConfigureAwait(false);
+        if (includeGlobalSettings)
+        {
+            await SaveGlobalAsync(context, config, cancellationToken).ConfigureAwait(false);
+        }
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var tagCount = await context.Tags.CountAsync(cancellationToken).ConfigureAwait(false);

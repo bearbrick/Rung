@@ -129,6 +129,56 @@ public sealed record ReloadView(
     IReadOnlyList<string> Removed,
     IReadOnlyList<string> Unchanged);
 
+/// <summary>配置来源摘要。</summary>
+/// <param name="Source">来源描述。</param>
+/// <param name="Writable">是否可在线修改。JSON 文件来源为只读。</param>
+/// <param name="DeviceCount">设备数。</param>
+/// <param name="TagCount">点位数。</param>
+public sealed record ConfigSummaryView(string Source, bool Writable, int DeviceCount, int TagCount);
+
+/// <summary>一台设备的校验结果。</summary>
+/// <param name="DeviceId">设备标识。</param>
+/// <param name="Protocol">协议。</param>
+/// <param name="TagCount">点位数。</param>
+/// <param name="RequestCount">每轮请求次数。</param>
+/// <param name="Issues">配置问题。</param>
+public sealed record DeviceCheckView(
+    string DeviceId, string Protocol, int TagCount, int RequestCount,
+    IReadOnlyList<TagIssueView> Issues);
+
+/// <summary>整份配置的校验结果。</summary>
+/// <param name="Devices">逐设备结果。</param>
+/// <param name="DuplicateTagNames">跨设备重复的点位名。</param>
+/// <param name="FileIssues">解析文件时逐行发现的问题（仅 Excel）。</param>
+/// <param name="TagCount">点位总数。</param>
+/// <param name="RequestCount">每轮请求总数。</param>
+/// <param name="ProblemCount">问题总数。</param>
+public sealed record ConfigCheckView(
+    IReadOnlyList<DeviceCheckView> Devices,
+    IReadOnlyList<string> DuplicateTagNames,
+    IReadOnlyList<string> FileIssues,
+    int TagCount,
+    int RequestCount,
+    int ProblemCount)
+{
+    /// <summary>解析出来的配置。仅供服务端内部使用，不序列化给调用方。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Rung.Configuration.RungConfig? Config { get; init; }
+}
+
+/// <summary>导入并生效的结果。</summary>
+/// <param name="Devices">导入的设备校验结果。</param>
+/// <param name="Added">新启动的设备。</param>
+/// <param name="Restarted">被重启的设备。</param>
+/// <param name="Removed">被移除的设备。</param>
+/// <param name="Unchanged">原地继续跑的设备。</param>
+public sealed record ImportView(
+    IReadOnlyList<DeviceCheckView> Devices,
+    IReadOnlyList<string> Added,
+    IReadOnlyList<string> Restarted,
+    IReadOnlyList<string> Removed,
+    IReadOnlyList<string> Unchanged);
+
 /// <summary>写点位的请求体。</summary>
 /// <param name="Value">要写入的工程值。网关按点位的数据类型自行转换。</param>
 public sealed record WriteTagRequest(System.Text.Json.JsonElement Value);

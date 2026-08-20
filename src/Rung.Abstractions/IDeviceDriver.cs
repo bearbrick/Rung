@@ -108,4 +108,19 @@ public interface IDeviceDriverFactory
 
     /// <summary>创建一个驱动实例。此时不应发起任何网络 IO。</summary>
     IDeviceDriver Create(DeviceOptions options);
+
+    /// <summary>
+    /// <b>不连接设备</b>地编译一份读取计划，用于离线校验配置。
+    /// <para>
+    /// 地址解析、类型与地址宽度是否匹配、批量合并成几次请求——这些全是纯逻辑，
+    /// 没有理由等到现场连上设备才发现。出差前跑一遍，能省掉的是
+    /// "到了现场才知道点位表有二十个地址写错"。
+    /// </para>
+    /// <para>
+    /// 需要协商参数（如 S7 的 PDU 长度）时，实现应当取<b>最保守</b>的假设：
+    /// 真机协商出来只会更宽松，因此算出的请求次数是上界，
+    /// 不会给人过于乐观的印象。
+    /// </para>
+    /// </summary>
+    IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags);
 }

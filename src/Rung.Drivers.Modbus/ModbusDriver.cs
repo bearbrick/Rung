@@ -405,4 +405,19 @@ public sealed class ModbusDriverFactory : IDeviceDriverFactory
 
     /// <inheritdoc/>
     public IDeviceDriver Create(DeviceOptions options) => new ModbusDriver(options);
+
+    /// <inheritdoc/>
+    public IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        // Modbus 不协商任何东西，上限是协议固定的，因此离线编译与在线完全一致
+        var modbusOptions = ModbusDriverOptions.FromDeviceOptions(options);
+
+        return ModbusReadPlanner.Create(tags, new ModbusReadPlannerOptions
+        {
+            DefaultUnitId = modbusOptions.DefaultUnitId,
+            MaxGapRegisters = modbusOptions.MaxGapRegisters,
+        });
+    }
 }

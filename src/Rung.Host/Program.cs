@@ -133,6 +133,7 @@ var app = builder.Build();
 
 app.MapOpenApi();
 app.MapGatewayEndpoints();
+app.MapConfigEndpoints();
 
 // Web UI 的落脚点。现在是空的，前端构建产物会输出到这里
 app.UseDefaultFiles();

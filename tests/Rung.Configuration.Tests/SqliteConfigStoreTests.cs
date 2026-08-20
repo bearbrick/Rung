@@ -187,6 +187,46 @@ public class SqliteConfigStoreTests
     }
 
     [Fact]
+    public async Task 从Excel导入时不覆盖全局设置()
+    {
+        // Excel 只承载设备和点位。照单全收会把采集组周期、重连参数、
+        // Redis / MQTT 配置静默清空——表现为"改了个点位名，结果 Redis 输出没了"，
+        // 是最难联想到原因的一类事故
+        using var file = new TempFile(".db");
+        var store = new SqliteConfigStore(file.Path);
+
+        await store.ImportAsync(Sample(), replace: true, TestContext.Current.CancellationToken);
+
+        // 模拟从 Excel 读出来的配置：只有设备，没有任何全局设置
+        var fromExcel = new RungConfig { Devices = Sample().Devices };
+        await store.ImportAsync(
+            fromExcel, replace: true, TestContext.Current.CancellationToken,
+            includeGlobalSettings: false);
+
+        var back = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(750, back.PollIntervalMs);
+        Assert.Equal("factory-a", back.Redis!.KeyPrefix);
+    }
+
+    [Fact]
+    public async Task 从JSON导入时全局设置照常覆盖()
+    {
+        using var file = new TempFile(".db");
+        var store = new SqliteConfigStore(file.Path);
+
+        await store.ImportAsync(Sample(), replace: true, TestContext.Current.CancellationToken);
+        await store.ImportAsync(
+            Sample() with { PollIntervalMs = 250, Redis = null },
+            replace: true, TestContext.Current.CancellationToken);
+
+        var back = await store.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(250, back.PollIntervalMs);
+        Assert.Null(back.Redis);
+    }
+
+    [Fact]
     public void 空设备列表是合法状态而不是错误()
     {
         // 刚建好还没导入任何设备的数据库就是这样，抛异常会让用户

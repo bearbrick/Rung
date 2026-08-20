@@ -412,4 +412,18 @@ public sealed class S7DriverFactory : IDeviceDriverFactory
 
     /// <inheritdoc/>
     public IDeviceDriver Create(DeviceOptions options) => new S7Driver(options);
+
+    /// <summary>S7-300 的协商值，也是所有西门子 CPU 里最小的。</summary>
+    private const int ConservativePduLength = 240;
+
+    /// <inheritdoc/>
+    public IReadPlan CompileOffline(DeviceOptions options, IReadOnlyList<TagDef> tags)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var s7Options = S7DriverOptions.FromDeviceOptions(options);
+
+        return S7ReadPlanner.Create(tags, ConservativePduLength,
+            new S7ReadPlannerOptions { MaxGapBytes = s7Options.MaxGapBytes });
+    }
 }

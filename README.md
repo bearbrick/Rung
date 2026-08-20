@@ -215,7 +215,10 @@ S7-1200/1500 通常是 rack 0 / slot 1。
 | GET | `/api/tags` | 点位最新值，支持 `?device=` 与 `?prefix=` |
 | GET | `/api/tags/{name}` | 单个点位 |
 | POST | `/api/tags/{name}/write` | 写点位，**返回回读到的设备实际值** |
-| POST | `/api/config/reload` | 在线重载配置，不重启进程 |
+| GET | `/api/config/export` | 下载点位表 Excel |
+| POST | `/api/config/validate` | 上传配置只校验，不写入 |
+| POST | `/api/config/import` | 上传配置、校验通过后写入并在线生效 |
+| POST | `/api/config/reload` | 从配置源重新加载 |
 | GET | `/api/stream/tags` | 变化的实时推送（SSE） |
 | GET | `/metrics` | Prometheus 指标 |
 | GET | `/openapi/v1.json` | OpenAPI 文档 |
@@ -253,6 +256,11 @@ React 19 + TypeScript + Vite + Ant Design，构建产物输出到 `Rung.Host/www
 - **点位实时值**：SSE 增量更新而非轮询，值变化时闪一下绿底，虚拟滚动扛上千点位
 - **设备状况**：连接状态、上轮耗时、`点位/请求` 比、重连与超时次数，可展开看配置问题
 - **手动读写**：现场调试省一半时间，不用开博途也不用写临时脚本
+- **配置管理**：下载 Excel → 在 Excel 里改 → 上传校验 → 一键生效
+
+**刻意不做网页版的点位表格编辑器。** 几百行点位在网页表格里改，
+体验一定不如 Excel，而电气工程师手上本来就是 Excel。做那个是把力气
+花在跟 Excel 竞争上，不如把这条工作流打磨顺。
 
 TypeScript 类型由 OpenAPI 文档生成（`npm run gen:api`）。后端改了 DTO
 而前端没重新生成，`npm run lint` 会当场报错。
@@ -379,7 +387,7 @@ cd web && npm run lint
 - [x] Web 界面、设备模拟器、单文件与容器交付
 - [x] SQLite 配置存储 + Excel 导入导出
 - [x] 配置在线重载（Web 编辑的地基）
-- [ ] 点位配置的 Web 编辑界面
+- [x] Web 配置管理：Excel 下载 / 上传 / 校验 / 一键生效
 - [ ] 真机验证与报文夹具替换
 - [ ] Modbus RTU（串口）、三菱 MC、欧姆龙 FINS
 - [x] MQTT 输出
